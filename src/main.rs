@@ -3,6 +3,7 @@ use unvrs::cli::{Cli, Commands};
 use unvrs::config::Config;
 use unvrs::executor;
 use unvrs::resolver::{Resolver, SearchStatus};
+use unvrs::ui;
 
 fn main() {
     let cli = Cli::parse();
@@ -21,124 +22,167 @@ fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("error: {e}");
+        eprintln!("\n  {} {e}", ui::icon_fail());
         std::process::exit(1);
     }
 }
 
-fn cmd_search(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
-    println!("\nunvrs\n");
-    println!("Searching for {package}...\n");
-
-    let results = resolver.search_with_status(package);
-
-    for (backend_name, status) in &results {
-        match status {
-            SearchStatus::Found(_) => println!("  \x1b[32m✓\x1b[0m {backend_name}"),
-            SearchStatus::NotFound => println!("  \x1b[31m✗\x1b[0m {backend_name}"),
-            SearchStatus::NotImplemented => {
-                println!("  \x1b[33m!\x1b[0m {backend_name} (not implemented)")
-            }
-            SearchStatus::Error => println!("  \x1b[31m✗\x1b[0m {backend_name} (error)"),
+fn print_status_line(backend_name: &str, status: &SearchStatus) {
+    match status {
+        SearchStatus::Found(_) => println!("  {} {}", ui::icon_ok(), backend_name),
+        SearchStatus::NotFound => println!("  {} {}", ui::icon_fail(), backend_name),
+        SearchStatus::NotImplemented => {
+            println!(
+                "  {} {} {}",
+                ui::icon_warn(),
+                backend_name,
+                ui::dim("(not implemented)")
+            )
         }
+        SearchStatus::Error => println!("  {} {}", ui::icon_fail(), backend_name),
+    }
+}
+
+fn cmd_search(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
+    let spinner = ui::Spinner::new(&format!("Searching for {package}..."));
+    let results = resolver.search_with_status(package);
+    spinner.stop_with(&format!("Searched {package}"));
+
+    println!();
+    for (name, status) in &results {
+        print_status_line(name, status);
     }
 
     let mut found_any = false;
-    for (backend_name, status) in &results {
+    for (name, status) in &results {
         if let SearchStatus::Found(candidates) = status {
             if !found_any {
-                println!("\nFound:\n");
+                println!("\n  {}", ui::bold("Results:"));
                 found_any = true;
             }
             for c in candidates {
-                print!("  {} ", c.name);
-                if let Some(v) = &c.version {
-                    print!("{v} ");
-                }
-                println!("(source: {backend_name})");
+                let ver = c
+                    .version
+                    .as_deref()
+                    .map(|v| format!(" {v}"))
+                    .unwrap_or_default();
+                println!(
+                    "  {} {}{} {}",
+                    ui::icon_info(),
+                    c.name,
+                    ver,
+                    ui::dim(&format!("({name})"))
+                );
                 if let Some(desc) = &c.description {
-                    println!("    {desc}");
+                    println!("    {}", ui::dim(desc));
                 }
             }
         }
     }
 
     if !found_any {
-        println!("\nNo packages found for '{package}'.");
+        println!("\n  {} No packages found for '{package}'.", ui::icon_fail());
     }
-
     println!();
     Ok(())
 }
 
 fn cmd_info(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
-    println!("\nunvrs\n");
-    println!("Looking up info for {package}...\n");
+    let spinner = ui::Spinner::new(&format!("Looking up {package}..."));
+    let info = resolver.info(package)?;
+    spinner.stop_with(&format!("Found {package}"));
 
-    match resolver.info(package)? {
+    match info {
         Some(info) => {
-            println!("Name:          {}", info.name);
-            if let Some(v) = &info.version {
-                println!("Version:       {v}");
-            }
+            println!();
+            println!(
+                "  {} {}",
+                ui::bold(&info.name),
+                info.version.unwrap_or_default()
+            );
             if let Some(d) = &info.description {
-                println!("Description:   {d}");
+                println!("  {}", ui::dim(d));
             }
+            println!();
             if let Some(a) = &info.architecture {
-                println!("Architecture:  {a}");
+                println!("  {} arch     {a}", ui::icon_info());
             }
             if let Some(m) = &info.maintainer {
-                println!("Maintainer:    {m}");
+                println!("  {} maint    {m}", ui::icon_info());
             }
             if let Some(h) = &info.homepage {
-                println!("Homepage:      {h}");
-            }
-            if let Some(s) = &info.installed_size {
-                println!("Installed:     {s}");
+                println!("  {} home     {h}", ui::icon_info());
             }
             if !info.dependencies.is_empty() {
-                println!("Dependencies:  {}", info.dependencies.join(", "));
+                println!(
+                    "  {} deps     {}",
+                    ui::icon_info(),
+                    info.dependencies.join(", ")
+                );
             }
-            println!("Backend:       {}", info.backend);
+            println!("  {} backend  {}", ui::icon_info(), ui::dim(&info.backend));
         }
         None => {
-            println!("No information found for '{package}'.");
+            println!(
+                "\n  {} No information found for '{package}'.",
+                ui::icon_fail()
+            );
         }
     }
-
     println!();
     Ok(())
 }
 
 fn cmd_install(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
-    println!("\nunvrs\n");
-
+    println!();
     if !executor::is_root() && executor::is_sudo_available() {
-        println!("Note: this operation may require root privileges.\n");
+        println!("  {} {}", ui::icon_warn(), ui::dim("may require sudo"));
     }
 
-    println!("Searching for {package}...\n");
-
+    let spinner = ui::Spinner::new(&format!("Searching for {package}..."));
     let results = resolver.search_with_status(package);
+    spinner.stop_with(&format!("Searched {package}"));
 
-    for (backend_name, status) in &results {
-        match status {
-            SearchStatus::Found(_) => println!("  \x1b[32m✓\x1b[0m {backend_name}"),
-            SearchStatus::NotFound => println!("  \x1b[31m✗\x1b[0m {backend_name}"),
-            SearchStatus::NotImplemented => {
-                println!("  \x1b[33m!\x1b[0m {backend_name} (not implemented)")
+    println!();
+    for (name, status) in &results {
+        print_status_line(name, status);
+    }
+
+    // Check OS compatibility
+    let os = resolver.os();
+    let mut incompatible_warned = false;
+    for (name, status) in &results {
+        if let SearchStatus::Found(_) = status {
+            if let Some(backend) = resolver.registry().find_by_name(name) {
+                if backend.is_available() && !backend.is_compatible(os) {
+                    if !incompatible_warned {
+                        println!(
+                            "\n  {} {}",
+                            ui::icon_warn(),
+                            ui::dim("Some backends are not native to your OS:")
+                        );
+                        incompatible_warned = true;
+                    }
+                    println!(
+                        "    {} {} {}",
+                        ui::icon_warn(),
+                        name,
+                        ui::dim(&format!("(not native to {})", os.family))
+                    );
+                }
             }
-            SearchStatus::Error => println!("  \x1b[31m✗\x1b[0m {backend_name} (error)"),
         }
     }
+    if incompatible_warned {
+        println!();
+    }
 
-    println!("\nInstalling...\n");
-
+    let spinner2 = ui::Spinner::new("Installing...");
     let result = resolver.install(package)?;
     if result.success {
-        println!("\x1b[32m✓\x1b[0m {}", result.message);
+        spinner2.stop_with(&format!("{} {}", ui::icon_ok(), result.message));
     } else {
-        println!("\x1b[31m✗\x1b[0m {}", result.message);
+        spinner2.stop_with(&format!("{} {}", ui::icon_fail(), result.message));
     }
 
     println!();
@@ -146,109 +190,152 @@ fn cmd_install(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
 }
 
 fn cmd_remove(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
-    println!("\nunvrs\n");
-    println!("Removing {package}...\n");
-
+    println!();
+    let spinner = ui::Spinner::new(&format!("Removing {package}..."));
     let result = resolver.remove(package)?;
     if result.success {
-        println!("\x1b[32m✓\x1b[0m {}", result.message);
+        spinner.stop_with(&format!("{} {}", ui::icon_ok(), result.message));
     } else {
-        println!("\x1b[31m✗\x1b[0m {}", result.message);
+        spinner.stop_with(&format!("{} {}", ui::icon_fail(), result.message));
     }
-
     println!();
     Ok(())
 }
 
 fn cmd_update(resolver: &Resolver) -> unvrs::error::Result<()> {
-    println!("\nunvrs\n");
-    println!("Updating package lists...\n");
-
+    println!();
+    let spinner = ui::Spinner::new("Updating package lists...");
     let results = resolver.update()?;
+    spinner.stop_with("Package lists updated");
+    println!();
     for r in &results {
         if r.success {
-            println!("\x1b[32m✓\x1b[0m {}", r.message);
+            println!("  {} {}", ui::icon_ok(), r.message);
         } else {
-            println!("\x1b[31m✗\x1b[0m {}", r.message);
+            println!("  {} {}", ui::icon_fail(), r.message);
         }
     }
-
     println!();
     Ok(())
 }
 
 fn cmd_upgrade(resolver: &Resolver) -> unvrs::error::Result<()> {
-    println!("\nunvrs\n");
-    println!("Upgrading packages...\n");
-
+    println!();
+    let spinner = ui::Spinner::new("Upgrading packages...");
     let results = resolver.upgrade()?;
+    spinner.stop_with("Upgrade complete");
+    println!();
     for r in &results {
         if r.success {
-            println!("\x1b[32m✓\x1b[0m {}", r.message);
+            println!("  {} {}", ui::icon_ok(), r.message);
         } else {
-            println!("\x1b[31m✗\x1b[0m {}", r.message);
+            println!("  {} {}", ui::icon_fail(), r.message);
         }
     }
-
     println!();
     Ok(())
 }
 
 fn cmd_list(resolver: &Resolver) -> unvrs::error::Result<()> {
-    println!("\nunvrs\n");
-    println!("Installed packages:\n");
-
+    let spinner = ui::Spinner::new("Listing installed packages...");
     let packages = resolver.list_installed()?;
+    spinner.stop_with(&format!("Found {} packages", packages.len()));
+
+    println!();
     if packages.is_empty() {
-        println!("  (no packages found via available backends)");
+        println!(
+            "  {} {}",
+            ui::icon_warn(),
+            ui::dim("no packages found via available backends")
+        );
     } else {
         for p in &packages {
-            println!("  {} {} ({})", p.name, p.version, p.backend);
+            println!(
+                "  {} {} {} {}",
+                ui::icon_info(),
+                ui::bold(&p.name),
+                ui::dim(&p.version),
+                ui::dim(&format!("({})", p.backend))
+            );
         }
     }
-
     println!();
     Ok(())
 }
 
 fn cmd_doctor(resolver: &Resolver) -> unvrs::error::Result<()> {
     let os = resolver.os();
-    println!("\nunvrs doctor\n");
 
-    println!("Operating system:");
-    println!("  \x1b[32m✓\x1b[0m {} ({})", os.name, os.family);
+    println!();
+    println!("  {}", ui::bold("unvrs doctor"));
+    println!();
 
-    println!("\nPackage manager backends:");
+    // OS
+    println!("  {}", ui::bold("System"));
+    println!("  {} os       {} ({})", ui::icon_ok(), os.name, os.family);
+
+    // Backends
+    println!();
+    println!("  {}", ui::bold("Backends"));
     for backend in resolver.registry().backends() {
         let compat = backend.is_compatible(os);
         let avail = backend.is_available();
+        let has_caps = backend.capabilities().can_search;
+
         if avail && compat {
-            println!("  \x1b[32m✓\x1b[0m {} (available)", backend.name());
-        } else if !backend.capabilities().can_search && avail {
             println!(
-                "  \x1b[33m!\x1b[0m {} (detected but not implemented)",
-                backend.name()
+                "  {} {:10} {}",
+                ui::icon_ok(),
+                backend.name(),
+                ui::dim("ready")
+            );
+        } else if avail && !compat {
+            println!(
+                "  {} {:10} {}",
+                ui::icon_warn(),
+                backend.name(),
+                ui::dim("wrong OS")
+            );
+        } else if has_caps {
+            println!(
+                "  {} {:10} {}",
+                ui::icon_warn(),
+                backend.name(),
+                ui::dim("not installed")
             );
         } else {
-            println!("  \x1b[31m✗\x1b[0m {}", backend.name());
+            println!(
+                "  {} {:10} {}",
+                ui::icon_fail(),
+                backend.name(),
+                ui::dim("stub")
+            );
         }
     }
 
-    println!("\nPrivileges:");
+    // Privileges
+    println!();
+    println!("  {}", ui::bold("Privileges"));
     if executor::is_root() {
-        println!("  \x1b[32m✓\x1b[0m running as root");
+        println!("  {} {}", ui::icon_ok(), ui::dim("root"));
     } else if executor::is_sudo_available() {
-        println!("  \x1b[32m✓\x1b[0m normal user (sudo available)");
+        println!("  {} {}", ui::icon_ok(), ui::dim("sudo available"));
     } else {
-        println!("  \x1b[33m!\x1b[0m normal user (sudo not found)");
+        println!("  {} {}", ui::icon_warn(), ui::dim("no sudo found"));
     }
 
-    println!("\nConfiguration:");
+    // Config
+    println!();
+    println!("  {}", ui::bold("Config"));
     let config_path = unvrs::config::Config::config_path();
     if config_path.exists() {
-        println!("  \x1b[32m✓\x1b[0m {}", config_path.display());
+        println!("  {} {}", ui::icon_ok(), config_path.display());
     } else {
-        println!("  \x1b[33m!\x1b[0m no config file (using defaults)");
+        println!(
+            "  {} {}",
+            ui::icon_warn(),
+            ui::dim("no config file (using defaults)")
+        );
     }
 
     println!();

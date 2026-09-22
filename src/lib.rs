@@ -7,3 +7,4 @@ pub mod os;
 pub mod package;
 pub mod registry;
 pub mod resolver;
+pub mod ui;
