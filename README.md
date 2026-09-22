@@ -28,19 +28,19 @@ unvrs detects the operating system, finds available package managers, searches f
 | pacman | Implemented | Arch Linux, Manjaro, etc. |
 | apt | Implemented | Debian, Ubuntu, etc. |
 | dnf | Implemented | Fedora, RHEL, etc. |
-| yum | Stub | RHEL/CentOS 7 |
-| zypper | Stub | openSUSE |
-| apk | Stub | Alpine |
-| xbps | Stub | Void Linux |
-| moss | Stub | moss-based distros |
-| emerge | Stub | Gentoo |
-| eopkg | Stub | Solus |
-| nix | Stub | NixOS |
-| guix | Stub | GNU Guix |
-| flatpak | Stub | Any Linux |
-| snap | Stub | Any Linux |
-| pkg | Stub | FreeBSD |
-| brew | Stub | macOS |
+| yum | Implemented | RHEL/CentOS 7 |
+| zypper | Implemented | openSUSE |
+| apk | Implemented | Alpine |
+| xbps | Implemented | Void Linux |
+| moss | Implemented | moss-based distros |
+| emerge | Implemented | Gentoo |
+| eopkg | Implemented | Solus |
+| nix | Implemented | NixOS |
+| guix | Implemented | GNU Guix |
+| flatpak | Implemented | Any Linux |
+| snap | Implemented | Any Linux |
+| pkg | Implemented | FreeBSD |
+| brew | Implemented | macOS, Linux |
 
 ## Quick Install (one-liner)
 

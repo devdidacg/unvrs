@@ -1,7 +1,20 @@
+pub mod apk;
 pub mod apt;
+pub mod brew;
 pub mod dnf;
+pub mod emerge;
+pub mod eopkg;
+pub mod flatpak;
+pub mod guix;
+pub mod moss;
+pub mod nix;
 pub mod pacman;
+pub mod pkg;
+pub mod snap;
 pub mod stubs;
+pub mod xbps;
+pub mod yum;
+pub mod zypper;
 
 use crate::config::Config;
 use crate::error::Result;
@@ -26,19 +39,19 @@ pub fn all_backends() -> Vec<Box<dyn PackageManager>> {
         Box::new(pacman::PacmanBackend::new()),
         Box::new(apt::AptBackend::new()),
         Box::new(dnf::DnfBackend::new()),
-        Box::new(stubs::YumBackend::new()),
-        Box::new(stubs::ZypperBackend::new()),
-        Box::new(stubs::ApkBackend::new()),
-        Box::new(stubs::XbpsBackend::new()),
-        Box::new(stubs::MossBackend::new()),
-        Box::new(stubs::EmergeBackend::new()),
-        Box::new(stubs::EopkgBackend::new()),
-        Box::new(stubs::NixBackend::new()),
-        Box::new(stubs::GuixBackend::new()),
-        Box::new(stubs::FlatpakBackend::new()),
-        Box::new(stubs::SnapBackend::new()),
-        Box::new(stubs::PkgBackend::new()),
-        Box::new(stubs::BrewBackend::new()),
+        Box::new(yum::YumBackend::new()),
+        Box::new(zypper::ZypperBackend::new()),
+        Box::new(apk::ApkBackend::new()),
+        Box::new(xbps::XbpsBackend::new()),
+        Box::new(moss::MossBackend::new()),
+        Box::new(emerge::EmergeBackend::new()),
+        Box::new(eopkg::EopkgBackend::new()),
+        Box::new(nix::NixBackend::new()),
+        Box::new(guix::GuixBackend::new()),
+        Box::new(flatpak::FlatpakBackend::new()),
+        Box::new(snap::SnapBackend::new()),
+        Box::new(pkg::PkgBackend::new()),
+        Box::new(brew::BrewBackend::new()),
     ]
 }
 
