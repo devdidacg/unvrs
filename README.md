@@ -12,6 +12,15 @@ sudo unvrs install fish
 
 unvrs detects the operating system, finds available package managers, searches for the package, and installs it through the appropriate native backend.
 
+### Features
+
+- Compact output with icons (✓ ✗ ⚠ ●)
+- Animated spinner during operations
+- Short flags for quick use (`-s`, `-i`, `-r`, etc.)
+- OS compatibility warnings (prevents using wrong backend)
+- Auto-detects available package managers
+- Typed errors with context
+
 ## Supported Backends
 
 | Backend | Status | Platforms |
@@ -34,30 +43,6 @@ unvrs detects the operating system, finds available package managers, searches f
 | brew | Stub | macOS |
 
 ## Installation
-
-### From source (recommended)
-
-Clone the repository and build with Cargo:
-
-```bash
-# Install Rust if not present
-sudo pacman -S rust
-
-# Clone and build
-git clone https://github.com/devdidacg/unvrs.git
-cd unvrs
-cargo build --release
-
-# Install to system path
-sudo cp target/release/unvrs /usr/local/bin/
-```
-
-### Verify installation
-
-```bash
-unvrs --version
-unvrs doctor
-```
 
 ### Arch Linux / Archcraft
 
@@ -89,17 +74,76 @@ cargo build --release
 sudo cp target/release/unvrs /usr/local/bin/
 ```
 
-## Usage
+### Verify
 
 ```bash
-unvrs search <package>       # Search all backends
-unvrs info <package>         # Show package details
-sudo unvrs install <package> # Install a package
-sudo unvrs remove <package>  # Remove a package
-unvrs update                 # Update package lists
-unvrs upgrade                # Upgrade packages
-unvrs list                   # List installed packages
-unvrs doctor                 # Diagnose system
+unvrs --version
+unvrs doctor
+```
+
+## Usage
+
+### Commands
+
+| Command | Short | Description |
+|---------|-------|-------------|
+| `unvrs search <pkg>` | `-s` | Search all backends |
+| `unvrs info <pkg>` | `-I` | Show package details |
+| `unvrs install <pkg>` | `-i` | Install a package |
+| `unvrs remove <pkg>` | `-r` | Remove a package |
+| `unvrs update` | `-U` | Update package lists |
+| `unvrs upgrade` | `-u` | Upgrade packages |
+| `unvrs list` | `-l` | List installed packages |
+| `unvrs doctor` | — | Diagnose system |
+
+### Examples
+
+```bash
+# Search
+unvrs -s fish
+unvrs search firefox
+
+# Install
+sudo unvrs -i fish
+sudo unvrs install neovim
+
+# Info
+unvrs -I git
+
+# Remove
+sudo unvrs -r fish
+
+# Update & Upgrade
+sudo unvrs -U
+sudo unvrs -u
+
+# List installed
+unvrs -l
+
+# Diagnose
+unvrs doctor
+```
+
+### Output
+
+```
+  ✓ Searching for fish...
+
+  ✓ pacman
+  ✗ apt
+  ✗ dnf
+
+  Results:
+  ● fish 4.0.0 (pacman)
+    Friendly interactive shell
+```
+
+### OS Compatibility
+
+If you try to install from a backend that doesn't match your OS, unvrs warns you:
+
+```
+  ⚠ apt (not native to Linux)
 ```
 
 ## Configuration
@@ -133,7 +177,7 @@ Core logic is portable. Linux-specific code is isolated in backends.
 cargo build
 
 # Run
-cargo run -- search fish
+cargo run -- -s fish
 
 # Test
 cargo test
