@@ -341,7 +341,7 @@ src/
 ├── os.rs            # OS detection
 ├── package.rs       # Domain models
 ├── registry.rs      # Backend discovery
-├── resolver.rs      # Universal search/install logic
+├── dispatcher.rs  # Universal search/install logic
 ├── ui.rs            # Spinner, icons, formatting
 └── backends/
     ├── mod.rs       # PackageManager trait

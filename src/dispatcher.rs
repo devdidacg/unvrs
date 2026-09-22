@@ -5,13 +5,13 @@ use crate::os;
 use crate::package::*;
 use crate::registry::BackendRegistry;
 
-pub struct Resolver {
+pub struct Dispatcher {
     registry: BackendRegistry,
     os: OperatingSystem,
     config: Config,
 }
 
-impl Resolver {
+impl Dispatcher {
     pub fn new(config: Config) -> Self {
         let os = os::detect();
         let registry = BackendRegistry::new(&os, &config);

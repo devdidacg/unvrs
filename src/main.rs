@@ -1,9 +1,9 @@
 use clap::Parser;
 use unvrs::cli::{Cli, Commands};
 use unvrs::config::Config;
+use unvrs::dispatcher::{Dispatcher, SearchStatus};
 use unvrs::executor;
 use unvrs::history;
-use unvrs::resolver::{Resolver, SearchStatus};
 use unvrs::ui;
 
 static mut NO_COLOR: bool = false;
@@ -18,25 +18,25 @@ fn main() {
     }
 
     let config = Config::load();
-    let resolver = Resolver::new(config);
+    let dispatcher = Dispatcher::new(config);
 
     let result = match cli.command {
-        Commands::Search { package, backend } => cmd_search(&resolver, &package, backend),
-        Commands::Info { package } => cmd_info(&resolver, &package),
+        Commands::Search { package, backend } => cmd_search(&dispatcher, &package, backend),
+        Commands::Info { package } => cmd_info(&dispatcher, &package),
         Commands::Install {
             package,
             dry,
             force,
             container,
-        } => cmd_install(&resolver, &package, dry, force, container),
-        Commands::Remove { package } => cmd_remove(&resolver, &package),
-        Commands::Update => cmd_update(&resolver),
-        Commands::Upgrade => cmd_upgrade(&resolver),
-        Commands::List => cmd_list(&resolver),
-        Commands::Outdated => cmd_outdated(&resolver),
+        } => cmd_install(&dispatcher, &package, dry, force, container),
+        Commands::Remove { package } => cmd_remove(&dispatcher, &package),
+        Commands::Update => cmd_update(&dispatcher),
+        Commands::Upgrade => cmd_upgrade(&dispatcher),
+        Commands::List => cmd_list(&dispatcher),
+        Commands::Outdated => cmd_outdated(&dispatcher),
         Commands::History => cmd_history(),
-        Commands::Clean => cmd_clean(&resolver),
-        Commands::Doctor => cmd_doctor(&resolver),
+        Commands::Clean => cmd_clean(&dispatcher),
+        Commands::Doctor => cmd_doctor(&dispatcher),
     };
 
     if let Err(e) = result {
@@ -112,21 +112,21 @@ fn print_status_line(backend_name: &str, status: &SearchStatus) {
 }
 
 fn cmd_search(
-    resolver: &Resolver,
+    dispatcher: &Dispatcher,
     package: &str,
     backend: Option<String>,
 ) -> unvrs::error::Result<()> {
     let spinner = ui::Spinner::new(&format!("Searching for {package}..."));
 
     let results = if let Some(ref backend_name) = backend {
-        let candidates = resolver.search_in_backend(package, backend_name)?;
+        let candidates = dispatcher.search_in_backend(package, backend_name)?;
         if candidates.is_empty() {
             vec![(backend_name.clone(), SearchStatus::NotFound)]
         } else {
             vec![(backend_name.clone(), SearchStatus::Found(candidates))]
         }
     } else {
-        resolver.search_with_status(package)
+        dispatcher.search_with_status(package)
     };
 
     spinner.stop_with(&format!("Searched {package}"));
@@ -186,9 +186,9 @@ fn cmd_search(
     Ok(())
 }
 
-fn cmd_info(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
+fn cmd_info(dispatcher: &Dispatcher, package: &str) -> unvrs::error::Result<()> {
     let spinner = ui::Spinner::new(&format!("Looking up {package}..."));
-    let info = resolver.info(package)?;
+    let info = dispatcher.info(package)?;
     spinner.stop_with(&format!("Found {package}"));
 
     if json_mode() {
@@ -241,7 +241,7 @@ fn cmd_info(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
 }
 
 fn cmd_install(
-    resolver: &Resolver,
+    dispatcher: &Dispatcher,
     package: &str,
     dry: bool,
     force: bool,
@@ -255,7 +255,7 @@ fn cmd_install(
     }
 
     let spinner = ui::Spinner::new(&format!("Searching for {package}..."));
-    let results = resolver.search_with_status(package);
+    let results = dispatcher.search_with_status(package);
     spinner.stop_with(&format!("Searched {package}"));
 
     if !json_mode() {
@@ -264,11 +264,11 @@ fn cmd_install(
             print_status_line(name, status);
         }
 
-        let os = resolver.os();
+        let os = dispatcher.os();
         let mut incompatible_warned = false;
         for (name, status) in &results {
             if let SearchStatus::Found(_) = status {
-                if let Some(backend) = resolver.registry().find_by_name(name) {
+                if let Some(backend) = dispatcher.registry().find_by_name(name) {
                     if backend.is_available() && !backend.is_compatible(os) {
                         if !incompatible_warned {
                             println!(
@@ -294,10 +294,10 @@ fn cmd_install(
     }
 
     let result = if dry {
-        resolver.install_dry(package, force || container)?
+        dispatcher.install_dry(package, force || container)?
     } else {
         let spinner2 = ui::Spinner::new("Installing...");
-        let r = resolver.install(package, force || container)?;
+        let r = dispatcher.install(package, force || container)?;
         if r.success {
             spinner2.stop_with(&format!("{} {}", icon_ok(), r.message));
         } else {
@@ -328,12 +328,12 @@ fn cmd_install(
     Ok(())
 }
 
-fn cmd_remove(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
+fn cmd_remove(dispatcher: &Dispatcher, package: &str) -> unvrs::error::Result<()> {
     if !json_mode() {
         println!();
     }
     let spinner = ui::Spinner::new(&format!("Removing {package}..."));
-    let result = resolver.remove(package)?;
+    let result = dispatcher.remove(package)?;
 
     history::add_entry("remove", package, &result.backend, result.success);
 
@@ -360,12 +360,12 @@ fn cmd_remove(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
     Ok(())
 }
 
-fn cmd_update(resolver: &Resolver) -> unvrs::error::Result<()> {
+fn cmd_update(dispatcher: &Dispatcher) -> unvrs::error::Result<()> {
     if !json_mode() {
         println!();
     }
     let spinner = ui::Spinner::new("Updating package lists...");
-    let results = resolver.update()?;
+    let results = dispatcher.update()?;
     spinner.stop_with("Package lists updated");
 
     if json_mode() {
@@ -397,12 +397,12 @@ fn cmd_update(resolver: &Resolver) -> unvrs::error::Result<()> {
     Ok(())
 }
 
-fn cmd_upgrade(resolver: &Resolver) -> unvrs::error::Result<()> {
+fn cmd_upgrade(dispatcher: &Dispatcher) -> unvrs::error::Result<()> {
     if !json_mode() {
         println!();
     }
     let spinner = ui::Spinner::new("Upgrading packages...");
-    let results = resolver.upgrade()?;
+    let results = dispatcher.upgrade()?;
     spinner.stop_with("Upgrade complete");
 
     if json_mode() {
@@ -434,9 +434,9 @@ fn cmd_upgrade(resolver: &Resolver) -> unvrs::error::Result<()> {
     Ok(())
 }
 
-fn cmd_list(resolver: &Resolver) -> unvrs::error::Result<()> {
+fn cmd_list(dispatcher: &Dispatcher) -> unvrs::error::Result<()> {
     let spinner = ui::Spinner::new("Listing installed packages...");
-    let packages = resolver.list_installed()?;
+    let packages = dispatcher.list_installed()?;
     spinner.stop_with(&format!("Found {} packages", packages.len()));
 
     if json_mode() {
@@ -469,9 +469,9 @@ fn cmd_list(resolver: &Resolver) -> unvrs::error::Result<()> {
     Ok(())
 }
 
-fn cmd_outdated(resolver: &Resolver) -> unvrs::error::Result<()> {
+fn cmd_outdated(dispatcher: &Dispatcher) -> unvrs::error::Result<()> {
     let spinner = ui::Spinner::new("Checking for outdated packages...");
-    let packages = resolver.outdated()?;
+    let packages = dispatcher.outdated()?;
     spinner.stop_with(&format!("Found {} outdated", packages.len()));
 
     if json_mode() {
@@ -538,12 +538,12 @@ fn cmd_history() -> unvrs::error::Result<()> {
     Ok(())
 }
 
-fn cmd_clean(resolver: &Resolver) -> unvrs::error::Result<()> {
+fn cmd_clean(dispatcher: &Dispatcher) -> unvrs::error::Result<()> {
     if !json_mode() {
         println!();
     }
     let spinner = ui::Spinner::new("Cleaning package caches...");
-    let results = resolver.clean()?;
+    let results = dispatcher.clean()?;
     spinner.stop_with("Cache cleaned");
 
     if json_mode() {
@@ -575,11 +575,11 @@ fn cmd_clean(resolver: &Resolver) -> unvrs::error::Result<()> {
     Ok(())
 }
 
-fn cmd_doctor(resolver: &Resolver) -> unvrs::error::Result<()> {
-    let os = resolver.os();
+fn cmd_doctor(dispatcher: &Dispatcher) -> unvrs::error::Result<()> {
+    let os = dispatcher.os();
 
     if json_mode() {
-        let backends: Vec<_> = resolver
+        let backends: Vec<_> = dispatcher
             .registry()
             .backends()
             .iter()
@@ -618,7 +618,7 @@ fn cmd_doctor(resolver: &Resolver) -> unvrs::error::Result<()> {
 
     println!();
     println!("  {}", ui::bold("Backends"));
-    for backend in resolver.registry().backends() {
+    for backend in dispatcher.registry().backends() {
         let compat = backend.is_compatible(os);
         let avail = backend.is_available();
         let has_caps = backend.capabilities().can_search;
