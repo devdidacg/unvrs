@@ -27,7 +27,8 @@ fn main() {
             package,
             dry,
             force,
-        } => cmd_install(&resolver, &package, dry, force),
+            container,
+        } => cmd_install(&resolver, &package, dry, force, container),
         Commands::Remove { package } => cmd_remove(&resolver, &package),
         Commands::Update => cmd_update(&resolver),
         Commands::Upgrade => cmd_upgrade(&resolver),
@@ -244,6 +245,7 @@ fn cmd_install(
     package: &str,
     dry: bool,
     force: bool,
+    container: bool,
 ) -> unvrs::error::Result<()> {
     if !json_mode() {
         println!();
@@ -292,10 +294,10 @@ fn cmd_install(
     }
 
     let result = if dry {
-        resolver.install_dry(package, force)?
+        resolver.install_dry(package, force || container)?
     } else {
         let spinner2 = ui::Spinner::new("Installing...");
-        let r = resolver.install(package, force)?;
+        let r = resolver.install(package, force || container)?;
         if r.success {
             spinner2.stop_with(&format!("{} {}", icon_ok(), r.message));
         } else {

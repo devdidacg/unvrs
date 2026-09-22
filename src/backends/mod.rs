@@ -82,7 +82,44 @@ pub fn available_backends(os: &OperatingSystem, config: &Config) -> Vec<Box<dyn 
     let preferred = config.preferred_backends();
     let mut backends: Vec<Box<dyn PackageManager>> = all_backends()
         .into_iter()
-        .filter(|b| b.is_available() && (b.is_compatible(os) || b.is_universal()))
+        .filter(|b| {
+            let is_container = b.name().contains("(docker)") || b.name().contains("(podman)");
+            if is_container {
+                b.is_available()
+            } else {
+                b.is_available() && (b.is_compatible(os) || b.is_universal())
+            }
+        })
+        .collect();
+
+    if !preferred.is_empty() {
+        backends.sort_by_key(|b| {
+            let name = b.name().to_string();
+            preferred
+                .iter()
+                .position(|p| p == &name)
+                .unwrap_or(usize::MAX)
+        });
+    }
+
+    backends
+}
+
+pub fn all_backends_including_unavailable(
+    os: &OperatingSystem,
+    config: &Config,
+) -> Vec<Box<dyn PackageManager>> {
+    let preferred = config.preferred_backends();
+    let mut backends: Vec<Box<dyn PackageManager>> = all_backends()
+        .into_iter()
+        .filter(|b| {
+            let is_container = b.name().contains("(docker)") || b.name().contains("(podman)");
+            if is_container {
+                b.is_available()
+            } else {
+                b.is_compatible(os) || b.is_universal()
+            }
+        })
         .collect();
 
     if !preferred.is_empty() {

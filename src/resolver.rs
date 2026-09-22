@@ -58,7 +58,7 @@ impl Resolver {
 
     pub fn search_with_status(&self, package: &str) -> Vec<(String, SearchStatus)> {
         self.registry
-            .search_available(package)
+            .search_all_backends(package)
             .into_iter()
             .map(|(name, result)| {
                 let status = match result {
@@ -91,13 +91,17 @@ impl Resolver {
         }
 
         let selected = if force {
-            candidates.first().expect("called with empty candidates")
+            candidates
+                .iter()
+                .find(|c| c.backend.contains("(docker)") || c.backend.contains("(podman)"))
+                .or_else(|| candidates.first())
+                .expect("called with empty candidates")
         } else {
             self.select_best(&candidates)
         };
         let backend = self
             .registry
-            .find_by_name(&selected.backend)
+            .find_by_name_any(&selected.backend)
             .ok_or_else(|| UnvrsError::BackendUnavailable(selected.backend.clone()))?;
 
         backend.install(package)
@@ -110,7 +114,11 @@ impl Resolver {
         }
 
         let selected = if force {
-            candidates.first().expect("called with empty candidates")
+            candidates
+                .iter()
+                .find(|c| c.backend.contains("(docker)") || c.backend.contains("(podman)"))
+                .or_else(|| candidates.first())
+                .expect("called with empty candidates")
         } else {
             self.select_best(&candidates)
         };

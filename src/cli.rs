@@ -48,6 +48,9 @@ pub enum Commands {
         /// Force installation from any backend (including cross-distro)
         #[arg(long)]
         force: bool,
+        /// Force installation via container backend (Docker/Podman)
+        #[arg(long)]
+        container: bool,
     },
     /// Remove a package
     #[command(short_flag = 'r')]
