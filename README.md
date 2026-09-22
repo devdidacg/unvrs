@@ -33,6 +33,62 @@ unvrs detects the operating system, finds available package managers, searches f
 | pkg | Stub | FreeBSD |
 | brew | Stub | macOS |
 
+## Installation
+
+### From source (recommended)
+
+Clone the repository and build with Cargo:
+
+```bash
+# Install Rust if not present
+sudo pacman -S rust
+
+# Clone and build
+git clone https://github.com/devdidacg/unvrs.git
+cd unvrs
+cargo build --release
+
+# Install to system path
+sudo cp target/release/unvrs /usr/local/bin/
+```
+
+### Verify installation
+
+```bash
+unvrs --version
+unvrs doctor
+```
+
+### Arch Linux / Archcraft
+
+```bash
+sudo pacman -S rust git
+git clone https://github.com/devdidacg/unvrs.git
+cd unvrs
+cargo build --release
+sudo cp target/release/unvrs /usr/local/bin/
+```
+
+### Debian / Ubuntu
+
+```bash
+sudo apt install rustc cargo git
+git clone https://github.com/devdidacg/unvrs.git
+cd unvrs
+cargo build --release
+sudo cp target/release/unvrs /usr/local/bin/
+```
+
+### Fedora
+
+```bash
+sudo dnf install rust cargo git
+git clone https://github.com/devdidacg/unvrs.git
+cd unvrs
+cargo build --release
+sudo cp target/release/unvrs /usr/local/bin/
+```
+
 ## Usage
 
 ```bash
@@ -70,10 +126,21 @@ CLI (clap)
 
 Core logic is portable. Linux-specific code is isolated in backends.
 
-## Building
+## Development
 
 ```bash
-cargo build --release
+# Build
+cargo build
+
+# Run
+cargo run -- search fish
+
+# Test
+cargo test
+
+# Lint
+cargo fmt
+cargo clippy
 ```
 
 ## Testing
