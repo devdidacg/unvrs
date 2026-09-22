@@ -2,7 +2,7 @@
 
 **Universal package manager CLI — one interface over many package managers.**
 
-[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/devdidacg/unvrs/releases)
+[![Version](https://img.shields.io/badge/version-0.5.1-blue.svg)](https://github.com/devdidacg/unvrs/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 

@@ -4,7 +4,7 @@ version = "0.5.1"
 edition = "2021"
 description = "Universal package manager CLI — one interface over many package managers"
 license = "MIT"
-repository = "https://github.com/unvrs/unvrs"
+repository = "https://github.com/devdidacg/unvrs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
