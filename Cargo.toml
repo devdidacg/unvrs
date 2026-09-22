@@ -1,0 +1,21 @@
+[package]
+name = "unvrs"
+version = "0.1.0"
+edition = "2021"
+description = "Universal package manager CLI — one interface over many package managers"
+license = "MIT"
+repository = "https://github.com/unvrs/unvrs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+dirs = "5"
+thiserror = "2"
+which = "7"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
