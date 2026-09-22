@@ -2,7 +2,7 @@
 
 **Universal package manager CLI — one interface over many package managers.**
 
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/devdidacg/unvrs/releases)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/devdidacg/unvrs/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 
@@ -16,12 +16,15 @@ unvrs is a unified CLI that orchestrates existing package managers. It does not 
 sudo unvrs install fish
 ```
 
-unvrs detects the operating system, finds available package managers, searches for the package, and installs it through the appropriate native backend.
+unvrs detects the operating system, finds available package managers, searches for the package, and installs it through the appropriate backend.
 
 ### Features
 
-- **16 package manager backends** — all fully implemented
+- **24 package manager backends** — all fully implemented
 - **AUR support** — searches AUR when yay/paru is installed
+- **Universal backends** — flatpak, snap, nix, guix, brew work on ANY Linux distro
+- **Container backends** — run apt, dnf, yum, apk, pacman, zypper via Docker/Podman
+- **Cross-distro installs** — install from apt on Arch, from pacman on Ubuntu, etc.
 - Compact output with icons (✓ ✗ ⚠ ●)
 - Animated spinner during operations
 - Short flags for quick use (`-s`, `-i`, `-r`, etc.)
@@ -33,6 +36,7 @@ unvrs detects the operating system, finds available package managers, searches f
 - **Installation history** (`unvrs history`)
 - **Dry run** (`unvrs install --dry`)
 - **Backend filter** (`unvrs search --backend pacman`)
+- **Force install** (`unvrs install --force`) — install from any backend regardless of OS
 - **Clean cache** (`unvrs clean`)
 - **Search cache** — faster repeated searches
 - TOML configuration
@@ -41,6 +45,8 @@ unvrs detects the operating system, finds available package managers, searches f
 ---
 
 ## Supported Backends
+
+### Native Backends
 
 | Backend | Status | Platforms |
 |:--------|:------:|-----------|
@@ -54,12 +60,29 @@ unvrs detects the operating system, finds available package managers, searches f
 | moss | ![](https://img.shields.io/badge/-Implemented-brightgreen) | moss-based distros |
 | emerge | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Gentoo, Funtoo |
 | eopkg | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Solus |
-| nix | ![](https://img.shields.io/badge/-Implemented-brightgreen) | NixOS |
-| guix | ![](https://img.shields.io/badge/-Implemented-brightgreen) | GNU Guix |
-| flatpak | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Any Linux |
-| snap | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Any Linux |
-| pkg | ![](https://img.shields.io/badge/-Implemented-brightgreen) | FreeBSD |
-| brew | ![](https://img.shields.io/badge/-Implemented-brightgreen) | macOS, Linux |
+
+### Universal Backends (work on ANY Linux)
+
+| Backend | Status | Notes |
+|:--------|:------:|-------|
+| flatpak | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Containerized apps |
+| snap | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Containerized apps |
+| nix | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Reproducible builds |
+| guix | ![](https://img.shields.io/badge/-Implemented-brightgreen) | GNU project |
+| brew | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Homebrew |
+
+### Container Backends (via Docker/Podman)
+
+| Backend | Status | Image |
+|:--------|:------:|-------|
+| apt (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | debian:latest |
+| apt (podman) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | debian:latest |
+| dnf (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | fedora:latest |
+| dnf (podman) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | fedora:latest |
+| yum (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | centos:7 |
+| apk (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | alpine:latest |
+| pacman (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | archlinux:latest |
+| zypper (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | opensuse/leap:latest |
 
 ---
 
@@ -172,6 +195,7 @@ unvrs doctor
 |------|---------|-------------|
 | `--backend <name>` | search | Search only in a specific backend |
 | `--dry` | install | Simulate installation without changes |
+| `--force` | install | Install from any backend (cross-distro) |
 
 ### Examples
 
@@ -189,6 +213,10 @@ sudo unvrs install neovim
 
 # Dry run — simulate installation
 sudo unvrs install --dry fish
+
+# Force install from any backend (cross-distro)
+sudo unvrs install --force apt git    # Install git from apt on Arch
+sudo unvrs install --force dnf vim    # Install vim from dnf on Ubuntu
 
 # Get package info
 unvrs -I git
@@ -263,6 +291,13 @@ If you try to install from a backend that doesn't match your OS, unvrs warns you
   ⚠ apt (not native to Linux)
 ```
 
+With `--force`, you can install from any backend regardless of OS:
+
+```bash
+# On Arch, install from apt via Docker
+sudo unvrs install --force apt git
+```
+
 ---
 
 ## Configuration
@@ -287,6 +322,8 @@ CLI (clap)
   → Core (resolver, OS detection, config, cache)
     → Backend registry
       → Individual backends (pacman, apt, dnf, ...)
+      → Universal backends (flatpak, snap, nix, guix, brew)
+      → Container backends (apt-docker, dnf-docker, ...)
 ```
 
 ### Project structure
@@ -323,7 +360,8 @@ src/
     ├── flatpak.rs   # Any Linux
     ├── snap.rs      # Any Linux
     ├── pkg.rs       # FreeBSD
-    └── brew.rs      # macOS/Linux
+    ├── brew.rs      # macOS/Linux
+    └── container.rs # Docker/Podman backends
 ```
 
 ---
@@ -354,6 +392,7 @@ cargo clippy
 - No shell injection — arguments are passed separately via `std::process::Command`
 - Native package managers handle signature verification and dependency resolution
 - Root operations require explicit `sudo`
+- Container backends run with `--rm` flag (auto-cleanup)
 
 ---
 

@@ -30,6 +30,10 @@ impl PackageManager for SnapBackend {
         os.family == OsFamily::Linux
     }
 
+    fn is_universal(&self) -> bool {
+        true
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             can_search: true,

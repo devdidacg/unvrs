@@ -84,13 +84,17 @@ impl Resolver {
         Ok(None)
     }
 
-    pub fn install(&self, package: &str) -> Result<InstallationResult> {
+    pub fn install(&self, package: &str, force: bool) -> Result<InstallationResult> {
         let candidates = self.search(package)?;
         if candidates.is_empty() {
             return Err(UnvrsError::PackageNotFound(package.to_string()));
         }
 
-        let selected = self.select_best(&candidates);
+        let selected = if force {
+            candidates.first().expect("called with empty candidates")
+        } else {
+            self.select_best(&candidates)
+        };
         let backend = self
             .registry
             .find_by_name(&selected.backend)
@@ -99,13 +103,17 @@ impl Resolver {
         backend.install(package)
     }
 
-    pub fn install_dry(&self, package: &str) -> Result<InstallationResult> {
+    pub fn install_dry(&self, package: &str, force: bool) -> Result<InstallationResult> {
         let candidates = self.search(package)?;
         if candidates.is_empty() {
             return Err(UnvrsError::PackageNotFound(package.to_string()));
         }
 
-        let selected = self.select_best(&candidates);
+        let selected = if force {
+            candidates.first().expect("called with empty candidates")
+        } else {
+            self.select_best(&candidates)
+        };
         Ok(InstallationResult {
             success: true,
             backend: selected.backend.clone(),

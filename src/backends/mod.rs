@@ -1,6 +1,7 @@
 pub mod apk;
 pub mod apt;
 pub mod brew;
+pub mod container;
 pub mod dnf;
 pub mod emerge;
 pub mod eopkg;
@@ -24,6 +25,9 @@ pub trait PackageManager: Send + Sync {
     fn name(&self) -> &'static str;
     fn is_available(&self) -> bool;
     fn is_compatible(&self, os: &OperatingSystem) -> bool;
+    fn is_universal(&self) -> bool {
+        false
+    }
     fn capabilities(&self) -> BackendCapabilities;
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>>;
     fn info(&self, package: &str) -> Result<Option<PackageInfo>>;
@@ -63,6 +67,14 @@ pub fn all_backends() -> Vec<Box<dyn PackageManager>> {
         Box::new(snap::SnapBackend::new()),
         Box::new(pkg::PkgBackend::new()),
         Box::new(brew::BrewBackend::new()),
+        Box::new(container::ContainerBackend::apt_docker()),
+        Box::new(container::ContainerBackend::apt_podman()),
+        Box::new(container::ContainerBackend::dnf_docker()),
+        Box::new(container::ContainerBackend::dnf_podman()),
+        Box::new(container::ContainerBackend::yum_docker()),
+        Box::new(container::ContainerBackend::apk_docker()),
+        Box::new(container::ContainerBackend::pacman_docker()),
+        Box::new(container::ContainerBackend::zypper_docker()),
     ]
 }
 
@@ -70,7 +82,7 @@ pub fn available_backends(os: &OperatingSystem, config: &Config) -> Vec<Box<dyn 
     let preferred = config.preferred_backends();
     let mut backends: Vec<Box<dyn PackageManager>> = all_backends()
         .into_iter()
-        .filter(|b| b.is_available() && b.is_compatible(os))
+        .filter(|b| b.is_available() && (b.is_compatible(os) || b.is_universal()))
         .collect();
 
     if !preferred.is_empty() {

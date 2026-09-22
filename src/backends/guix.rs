@@ -30,6 +30,10 @@ impl PackageManager for GuixBackend {
         os.family == OsFamily::Linux || os.family == OsFamily::MacOS
     }
 
+    fn is_universal(&self) -> bool {
+        true
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             can_search: true,

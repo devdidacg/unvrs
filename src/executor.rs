@@ -50,6 +50,24 @@ pub fn execute_sudo(program: &str, args: &[&str]) -> Result<CommandResult> {
     })
 }
 
+pub fn execute_raw(command: &str) -> Result<CommandResult> {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .output()
+        .map_err(|e| UnvrsError::CommandFailed {
+            command: command.to_string(),
+            exit_code: -1,
+            stderr: e.to_string(),
+        })?;
+
+    Ok(CommandResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: output.status.code().unwrap_or(-1),
+    })
+}
+
 pub fn is_available(program: &str) -> bool {
     which::which(program).is_ok()
 }

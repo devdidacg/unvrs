@@ -45,6 +45,9 @@ pub enum Commands {
         /// Simulate installation without making changes
         #[arg(long)]
         dry: bool,
+        /// Force installation from any backend (including cross-distro)
+        #[arg(long)]
+        force: bool,
     },
     /// Remove a package
     #[command(short_flag = 'r')]

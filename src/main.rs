@@ -23,7 +23,11 @@ fn main() {
     let result = match cli.command {
         Commands::Search { package, backend } => cmd_search(&resolver, &package, backend),
         Commands::Info { package } => cmd_info(&resolver, &package),
-        Commands::Install { package, dry } => cmd_install(&resolver, &package, dry),
+        Commands::Install {
+            package,
+            dry,
+            force,
+        } => cmd_install(&resolver, &package, dry, force),
         Commands::Remove { package } => cmd_remove(&resolver, &package),
         Commands::Update => cmd_update(&resolver),
         Commands::Upgrade => cmd_upgrade(&resolver),
@@ -235,7 +239,12 @@ fn cmd_info(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
     Ok(())
 }
 
-fn cmd_install(resolver: &Resolver, package: &str, dry: bool) -> unvrs::error::Result<()> {
+fn cmd_install(
+    resolver: &Resolver,
+    package: &str,
+    dry: bool,
+    force: bool,
+) -> unvrs::error::Result<()> {
     if !json_mode() {
         println!();
         if !executor::is_root() && executor::is_sudo_available() {
@@ -283,10 +292,10 @@ fn cmd_install(resolver: &Resolver, package: &str, dry: bool) -> unvrs::error::R
     }
 
     let result = if dry {
-        resolver.install_dry(package)?
+        resolver.install_dry(package, force)?
     } else {
         let spinner2 = ui::Spinner::new("Installing...");
-        let r = resolver.install(package)?;
+        let r = resolver.install(package, force)?;
         if r.success {
             spinner2.stop_with(&format!("{} {}", icon_ok(), r.message));
         } else {
