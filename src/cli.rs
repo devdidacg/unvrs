@@ -15,30 +15,37 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Search for a package
+    #[command(short_flag = 's')]
     Search {
         /// Package name to search for
         package: String,
     },
     /// Show detailed information about a package
+    #[command(short_flag = 'I')]
     Info {
         /// Package name
         package: String,
     },
     /// Install a package
+    #[command(short_flag = 'i')]
     Install {
         /// Package name to install
         package: String,
     },
     /// Remove a package
+    #[command(short_flag = 'r')]
     Remove {
         /// Package name to remove
         package: String,
     },
     /// Update package lists
+    #[command(short_flag = 'U')]
     Update,
     /// Upgrade installed packages
+    #[command(short_flag = 'u')]
     Upgrade,
     /// List installed packages
+    #[command(short_flag = 'l')]
     List,
     /// Diagnose system configuration
     Doctor,
