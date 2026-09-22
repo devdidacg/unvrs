@@ -42,9 +42,28 @@ unvrs detects the operating system, finds available package managers, searches f
 | pkg | Stub | FreeBSD |
 | brew | Stub | macOS |
 
+## Quick Install (one-liner)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/install.sh | bash
+```
+
 ## Installation
 
-### Arch Linux / Archcraft
+### Using the install script
+
+```bash
+# Install
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/install.sh | bash
+
+# Update
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/update.sh | bash
+
+# Uninstall
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/uninstall.sh | bash
+```
+
+### Manual install — Arch Linux / Archcraft
 
 ```bash
 sudo pacman -S rust git
@@ -54,7 +73,7 @@ cargo build --release
 sudo cp target/release/unvrs /usr/local/bin/
 ```
 
-### Debian / Ubuntu
+### Manual install — Debian / Ubuntu
 
 ```bash
 sudo apt install rustc cargo git
@@ -64,7 +83,7 @@ cargo build --release
 sudo cp target/release/unvrs /usr/local/bin/
 ```
 
-### Fedora
+### Manual install — Fedora
 
 ```bash
 sudo dnf install rust cargo git
