@@ -2,6 +2,7 @@ use clap::Parser;
 use unvrs::cli::{Cli, Commands};
 use unvrs::config::Config;
 use unvrs::executor;
+use unvrs::history;
 use unvrs::resolver::{Resolver, SearchStatus};
 use unvrs::ui;
 
@@ -20,14 +21,16 @@ fn main() {
     let resolver = Resolver::new(config);
 
     let result = match cli.command {
-        Commands::Search { package } => cmd_search(&resolver, &package),
+        Commands::Search { package, backend } => cmd_search(&resolver, &package, backend),
         Commands::Info { package } => cmd_info(&resolver, &package),
-        Commands::Install { package } => cmd_install(&resolver, &package),
+        Commands::Install { package, dry } => cmd_install(&resolver, &package, dry),
         Commands::Remove { package } => cmd_remove(&resolver, &package),
         Commands::Update => cmd_update(&resolver),
         Commands::Upgrade => cmd_upgrade(&resolver),
         Commands::List => cmd_list(&resolver),
         Commands::Outdated => cmd_outdated(&resolver),
+        Commands::History => cmd_history(),
+        Commands::Clean => cmd_clean(&resolver),
         Commands::Doctor => cmd_doctor(&resolver),
     };
 
@@ -35,7 +38,7 @@ fn main() {
         if json_mode() {
             println!("{{\"error\":\"{}\"}}", e);
         } else {
-            eprintln!("\n  {} {e}", ui::icon_fail());
+            eprintln!("\n  {} {e}", icon_fail());
         }
         std::process::exit(1);
     }
@@ -81,6 +84,14 @@ fn icon_info() -> &'static str {
     }
 }
 
+fn dim(text: &str) -> String {
+    if no_color() {
+        text.to_string()
+    } else {
+        ui::dim(text)
+    }
+}
+
 fn print_status_line(backend_name: &str, status: &SearchStatus) {
     if json_mode() {
         return;
@@ -89,20 +100,30 @@ fn print_status_line(backend_name: &str, status: &SearchStatus) {
         SearchStatus::Found(_) => println!("  {} {}", icon_ok(), backend_name),
         SearchStatus::NotFound => println!("  {} {}", icon_fail(), backend_name),
         SearchStatus::NotImplemented => {
-            let msg = if no_color() {
-                "(stub)".to_string()
-            } else {
-                ui::dim("(stub)")
-            };
-            println!("  {} {} {}", icon_warn(), backend_name, msg)
+            println!("  {} {} {}", icon_warn(), backend_name, dim("(stub)"))
         }
         SearchStatus::Error => println!("  {} {}", icon_fail(), backend_name),
     }
 }
 
-fn cmd_search(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
+fn cmd_search(
+    resolver: &Resolver,
+    package: &str,
+    backend: Option<String>,
+) -> unvrs::error::Result<()> {
     let spinner = ui::Spinner::new(&format!("Searching for {package}..."));
-    let results = resolver.search_with_status(package);
+
+    let results = if let Some(ref backend_name) = backend {
+        let candidates = resolver.search_in_backend(package, backend_name)?;
+        if candidates.is_empty() {
+            vec![(backend_name.clone(), SearchStatus::NotFound)]
+        } else {
+            vec![(backend_name.clone(), SearchStatus::Found(candidates))]
+        }
+    } else {
+        resolver.search_with_status(package)
+    };
+
     spinner.stop_with(&format!("Searched {package}"));
 
     if json_mode() {
@@ -144,21 +165,10 @@ fn cmd_search(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
                     icon_info(),
                     c.name,
                     ver,
-                    if no_color() {
-                        format!("({name})")
-                    } else {
-                        ui::dim(&format!("({name})"))
-                    }
+                    dim(&format!("({name})"))
                 );
                 if let Some(desc) = &c.description {
-                    println!(
-                        "    {}",
-                        if no_color() {
-                            desc.clone()
-                        } else {
-                            ui::dim(desc)
-                        }
-                    );
+                    println!("    {}", dim(desc));
                 }
             }
         }
@@ -196,7 +206,7 @@ fn cmd_info(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
                 info.version.unwrap_or_default()
             );
             if let Some(d) = &info.description {
-                println!("  {}", if no_color() { d.clone() } else { ui::dim(d) });
+                println!("  {}", dim(d));
             }
             println!();
             if let Some(a) = &info.architecture {
@@ -215,15 +225,7 @@ fn cmd_info(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
                     info.dependencies.join(", ")
                 );
             }
-            println!(
-                "  {} backend  {}",
-                icon_info(),
-                if no_color() {
-                    info.backend.clone()
-                } else {
-                    ui::dim(&info.backend)
-                }
-            );
+            println!("  {} backend  {}", icon_info(), dim(&info.backend));
         }
         None => {
             println!("\n  {} No information found for '{package}'.", icon_fail());
@@ -233,19 +235,11 @@ fn cmd_info(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
     Ok(())
 }
 
-fn cmd_install(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
+fn cmd_install(resolver: &Resolver, package: &str, dry: bool) -> unvrs::error::Result<()> {
     if !json_mode() {
         println!();
         if !executor::is_root() && executor::is_sudo_available() {
-            println!(
-                "  {} {}",
-                icon_warn(),
-                if no_color() {
-                    "may require sudo".into()
-                } else {
-                    ui::dim("may require sudo")
-                }
-            );
+            println!("  {} {}", icon_warn(), dim("may require sudo"));
         }
     }
 
@@ -269,11 +263,7 @@ fn cmd_install(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
                             println!(
                                 "\n  {} {}",
                                 icon_warn(),
-                                if no_color() {
-                                    "Some backends are not native to your OS:".into()
-                                } else {
-                                    ui::dim("Some backends are not native to your OS:")
-                                }
+                                dim("Some backends are not native to your OS:")
                             );
                             incompatible_warned = true;
                         }
@@ -281,11 +271,7 @@ fn cmd_install(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
                             "    {} {} {}",
                             icon_warn(),
                             name,
-                            if no_color() {
-                                format!("(not native to {})", os.family)
-                            } else {
-                                ui::dim(&format!("(not native to {})", os.family))
-                            }
+                            dim(&format!("(not native to {})", os.family))
                         );
                     }
                 }
@@ -296,8 +282,20 @@ fn cmd_install(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
         }
     }
 
-    let spinner2 = ui::Spinner::new("Installing...");
-    let result = resolver.install(package)?;
+    let result = if dry {
+        resolver.install_dry(package)?
+    } else {
+        let spinner2 = ui::Spinner::new("Installing...");
+        let r = resolver.install(package)?;
+        if r.success {
+            spinner2.stop_with(&format!("{} {}", icon_ok(), r.message));
+        } else {
+            spinner2.stop_fail(&format!("{} {}", icon_fail(), r.message));
+        }
+        r
+    };
+
+    history::add_entry("install", package, &result.backend, result.success);
 
     if json_mode() {
         println!(
@@ -307,13 +305,10 @@ fn cmd_install(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
                 "backend": result.backend,
                 "package": result.package,
                 "message": result.message,
+                "dry_run": dry,
             }))
             .unwrap_or_default()
         );
-    } else if result.success {
-        spinner2.stop_with(&format!("{} {}", icon_ok(), result.message));
-    } else {
-        spinner2.stop_fail(&format!("{} {}", icon_fail(), result.message));
     }
 
     if !json_mode() {
@@ -328,6 +323,8 @@ fn cmd_remove(resolver: &Resolver, package: &str) -> unvrs::error::Result<()> {
     }
     let spinner = ui::Spinner::new(&format!("Removing {package}..."));
     let result = resolver.remove(package)?;
+
+    history::add_entry("remove", package, &result.backend, result.success);
 
     if json_mode() {
         println!(
@@ -444,11 +441,7 @@ fn cmd_list(resolver: &Resolver) -> unvrs::error::Result<()> {
         println!(
             "  {} {}",
             icon_warn(),
-            if no_color() {
-                "no packages found via available backends".into()
-            } else {
-                ui::dim("no packages found via available backends")
-            }
+            dim("no packages found via available backends")
         );
     } else {
         for p in &packages {
@@ -456,16 +449,8 @@ fn cmd_list(resolver: &Resolver) -> unvrs::error::Result<()> {
                 "  {} {} {} {}",
                 icon_info(),
                 ui::bold(&p.name),
-                if no_color() {
-                    p.version.clone()
-                } else {
-                    ui::dim(&p.version)
-                },
-                if no_color() {
-                    format!("({})", p.backend)
-                } else {
-                    ui::dim(&format!("({})", p.backend))
-                }
+                dim(&p.version),
+                dim(&format!("({})", p.backend))
             );
         }
     }
@@ -495,21 +480,87 @@ fn cmd_outdated(resolver: &Resolver) -> unvrs::error::Result<()> {
                 "  {} {} {} -> {} {}",
                 icon_warn(),
                 ui::bold(&p.name),
-                if no_color() {
-                    p.current_version.clone()
-                } else {
-                    ui::dim(&p.current_version)
-                },
+                dim(&p.current_version),
                 ui::green(&p.latest_version),
-                if no_color() {
-                    format!("({})", p.backend)
-                } else {
-                    ui::dim(&format!("({})", p.backend))
-                }
+                dim(&format!("({})", p.backend))
             );
         }
     }
     println!();
+    Ok(())
+}
+
+fn cmd_history() -> unvrs::error::Result<()> {
+    let entries = history::load();
+
+    if json_mode() {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&entries).unwrap_or_default()
+        );
+        return Ok(());
+    }
+
+    println!();
+    println!("  {}", ui::bold("Installation History"));
+    println!();
+
+    if entries.is_empty() {
+        println!("  {} No history found.", icon_info());
+    } else {
+        for e in entries.iter().rev().take(20) {
+            let date = chrono::DateTime::from_timestamp(e.timestamp as i64, 0)
+                .map(|d| d.format("%Y-%m-%d %H:%M").to_string())
+                .unwrap_or_else(|| "unknown".into());
+            let icon = if e.success { icon_ok() } else { icon_fail() };
+            println!(
+                "  {} {} {} {} {}",
+                icon,
+                dim(&date),
+                dim(&e.action),
+                ui::bold(&e.package),
+                dim(&format!("({})", e.backend))
+            );
+        }
+    }
+    println!();
+    Ok(())
+}
+
+fn cmd_clean(resolver: &Resolver) -> unvrs::error::Result<()> {
+    if !json_mode() {
+        println!();
+    }
+    let spinner = ui::Spinner::new("Cleaning package caches...");
+    let results = resolver.clean()?;
+    spinner.stop_with("Cache cleaned");
+
+    if json_mode() {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(
+                &results
+                    .iter()
+                    .map(|r| serde_json::json!({
+                        "success": r.success,
+                        "backend": r.backend,
+                        "message": r.message,
+                    }))
+                    .collect::<Vec<_>>()
+            )
+            .unwrap_or_default()
+        );
+    } else {
+        println!();
+        for r in &results {
+            if r.success {
+                println!("  {} {}", icon_ok(), r.message);
+            } else {
+                println!("  {} {}", icon_warn(), r.message);
+            }
+        }
+        println!();
+    }
     Ok(())
 }
 
@@ -562,84 +613,34 @@ fn cmd_doctor(resolver: &Resolver) -> unvrs::error::Result<()> {
         let has_caps = backend.capabilities().can_search;
 
         if avail && compat {
-            println!(
-                "  {} {:10} {}",
-                icon_ok(),
-                backend.name(),
-                if no_color() {
-                    "ready".into()
-                } else {
-                    ui::dim("ready")
-                }
-            );
+            println!("  {} {:10} {}", icon_ok(), backend.name(), dim("ready"));
         } else if avail && !compat {
             println!(
                 "  {} {:10} {}",
                 icon_warn(),
                 backend.name(),
-                if no_color() {
-                    "wrong OS".into()
-                } else {
-                    ui::dim("wrong OS")
-                }
+                dim("wrong OS")
             );
         } else if has_caps {
             println!(
                 "  {} {:10} {}",
                 icon_warn(),
                 backend.name(),
-                if no_color() {
-                    "not installed".into()
-                } else {
-                    ui::dim("not installed")
-                }
+                dim("not installed")
             );
         } else {
-            println!(
-                "  {} {:10} {}",
-                icon_fail(),
-                backend.name(),
-                if no_color() {
-                    "stub".into()
-                } else {
-                    ui::dim("stub")
-                }
-            );
+            println!("  {} {:10} {}", icon_fail(), backend.name(), dim("stub"));
         }
     }
 
     println!();
     println!("  {}", ui::bold("Privileges"));
     if executor::is_root() {
-        println!(
-            "  {} {}",
-            icon_ok(),
-            if no_color() {
-                "root".into()
-            } else {
-                ui::dim("root")
-            }
-        );
+        println!("  {} {}", icon_ok(), dim("root"));
     } else if executor::is_sudo_available() {
-        println!(
-            "  {} {}",
-            icon_ok(),
-            if no_color() {
-                "sudo available".into()
-            } else {
-                ui::dim("sudo available")
-            }
-        );
+        println!("  {} {}", icon_ok(), dim("sudo available"));
     } else {
-        println!(
-            "  {} {}",
-            icon_warn(),
-            if no_color() {
-                "no sudo found".into()
-            } else {
-                ui::dim("no sudo found")
-            }
-        );
+        println!("  {} {}", icon_warn(), dim("no sudo found"));
     }
 
     println!();
@@ -651,11 +652,7 @@ fn cmd_doctor(resolver: &Resolver) -> unvrs::error::Result<()> {
         println!(
             "  {} {}",
             icon_warn(),
-            if no_color() {
-                "no config file (using defaults)".into()
-            } else {
-                ui::dim("no config file (using defaults)")
-            }
+            dim("no config file (using defaults)")
         );
     }
 

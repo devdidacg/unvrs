@@ -35,6 +35,14 @@ pub trait PackageManager: Send + Sync {
     fn outdated(&self) -> Result<Vec<OutdatedPackage>> {
         Ok(Vec::new())
     }
+    fn clean(&self) -> Result<InstallationResult> {
+        Ok(InstallationResult {
+            success: false,
+            backend: self.name().to_string(),
+            package: String::new(),
+            message: format!("clean not supported for {}", self.name()),
+        })
+    }
 }
 
 pub fn all_backends() -> Vec<Box<dyn PackageManager>> {

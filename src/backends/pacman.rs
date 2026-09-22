@@ -15,6 +15,16 @@ impl PacmanBackend {
     pub fn new() -> Self {
         Self
     }
+
+    fn aur_helper(&self) -> Option<String> {
+        if executor::is_available("yay") {
+            Some("yay".to_string())
+        } else if executor::is_available("paru") {
+            Some("paru".to_string())
+        } else {
+            None
+        }
+    }
 }
 
 impl PackageManager for PacmanBackend {
@@ -89,6 +99,41 @@ impl PackageManager for PacmanBackend {
                     architecture: None,
                     description: Some(desc),
                 });
+            }
+        }
+
+        // Also search AUR if yay or paru is available
+        if let Some(aur_helper) = self.aur_helper() {
+            if let Ok(aur_result) = executor::execute(&aur_helper, &["-Ss", package]) {
+                if aur_result.success() {
+                    for line in aur_result.stdout.lines() {
+                        if let Some(pos) = line.find('/') {
+                            let rest = &line[pos + 1..];
+                            if let Some(space_pos) = rest.find(' ') {
+                                let name = rest[..space_pos].to_string();
+                                let version = rest[space_pos + 1..]
+                                    .split_whitespace()
+                                    .next()
+                                    .unwrap_or("")
+                                    .to_string();
+                                if !candidates.iter().any(|c| c.name == name) {
+                                    candidates.push(PackageCandidate {
+                                        name,
+                                        version: if version.is_empty() {
+                                            None
+                                        } else {
+                                            Some(version)
+                                        },
+                                        source: PackageSource::System,
+                                        backend: "pacman (aur)".into(),
+                                        architecture: None,
+                                        description: None,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -286,6 +331,24 @@ impl PackageManager for PacmanBackend {
             .collect();
 
         Ok(packages)
+    }
+
+    fn clean(&self) -> Result<InstallationResult> {
+        let result = executor::execute("pacman", &["-Sc", "--noconfirm"])?;
+        Ok(InstallationResult {
+            success: result.success(),
+            backend: "pacman".into(),
+            package: String::new(),
+            message: if result.success() {
+                "Pacman cache cleaned".into()
+            } else {
+                format!(
+                    "pacman clean failed (exit {}): {}",
+                    result.exit_code,
+                    result.stderr.trim()
+                )
+            },
+        })
     }
 }
 

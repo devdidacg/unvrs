@@ -2,7 +2,7 @@
 
 **Universal package manager CLI — one interface over many package managers.**
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/devdidacg/unvrs/releases)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/devdidacg/unvrs/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 
@@ -21,6 +21,7 @@ unvrs detects the operating system, finds available package managers, searches f
 ### Features
 
 - **16 package manager backends** — all fully implemented
+- **AUR support** — searches AUR when yay/paru is installed
 - Compact output with icons (✓ ✗ ⚠ ●)
 - Animated spinner during operations
 - Short flags for quick use (`-s`, `-i`, `-r`, etc.)
@@ -29,6 +30,10 @@ unvrs detects the operating system, finds available package managers, searches f
 - **JSON output** (`--json`) for scripts and automation
 - **No-color mode** (`--no-color`) for pipes and CI
 - **Outdated packages** (`unvrs outdated`)
+- **Installation history** (`unvrs history`)
+- **Dry run** (`unvrs install --dry`)
+- **Backend filter** (`unvrs search --backend pacman`)
+- **Clean cache** (`unvrs clean`)
 - **Search cache** — faster repeated searches
 - TOML configuration
 - Typed errors with context
@@ -77,6 +82,13 @@ curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/update.sh | bas
 
 # Uninstall
 curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/uninstall.sh | bash
+```
+
+### Docker
+
+```bash
+docker build -t unvrs .
+docker run unvrs doctor
 ```
 
 ### Manual install
@@ -143,6 +155,8 @@ unvrs doctor
 | `unvrs upgrade` | `-u` | Upgrade packages |
 | `unvrs list` | `-l` | List installed packages |
 | `unvrs outdated` | — | Show packages with updates |
+| `unvrs history` | — | Show installation history |
+| `unvrs clean` | — | Clean package cache |
 | `unvrs doctor` | — | Diagnose system |
 
 ### Global flags
@@ -152,6 +166,13 @@ unvrs doctor
 | `--json` | Output in JSON format |
 | `--no-color` | Disable colored output |
 
+### Command flags
+
+| Flag | Command | Description |
+|------|---------|-------------|
+| `--backend <name>` | search | Search only in a specific backend |
+| `--dry` | install | Simulate installation without changes |
+
 ### Examples
 
 ```bash
@@ -159,9 +180,15 @@ unvrs doctor
 unvrs -s fish
 unvrs search firefox
 
+# Search only in pacman
+unvrs search --backend pacman neovim
+
 # Install a package (uses the best available backend)
 sudo unvrs -i fish
 sudo unvrs install neovim
+
+# Dry run — simulate installation
+sudo unvrs install --dry fish
 
 # Get package info
 unvrs -I git
@@ -180,6 +207,12 @@ unvrs -l
 
 # Check for outdated packages
 unvrs outdated
+
+# View installation history
+unvrs history
+
+# Clean package cache
+sudo unvrs clean
 
 # Diagnose your system
 unvrs doctor
@@ -204,6 +237,7 @@ unvrs --no-color list | grep vim
   Results:
   ● fish 4.0.0 (pacman)
     Friendly interactive shell
+  ● fish 4.0.0 (pacman (aur))
 ```
 
 ### JSON output
@@ -264,6 +298,7 @@ src/
 ├── cli.rs           # Clap CLI definitions
 ├── config.rs        # TOML config loading
 ├── cache.rs         # Search result cache
+├── history.rs       # Installation history
 ├── error.rs         # Typed errors
 ├── executor.rs      # Safe process execution
 ├── os.rs            # OS detection
@@ -273,7 +308,7 @@ src/
 ├── ui.rs            # Spinner, icons, formatting
 └── backends/
     ├── mod.rs       # PackageManager trait
-    ├── pacman.rs    # Arch Linux
+    ├── pacman.rs    # Arch Linux + AUR
     ├── apt.rs       # Debian/Ubuntu
     ├── dnf.rs       # Fedora
     ├── yum.rs       # RHEL/CentOS 7

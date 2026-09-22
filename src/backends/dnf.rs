@@ -222,4 +222,22 @@ impl PackageManager for DnfBackend {
 
         Ok(packages)
     }
+
+    fn clean(&self) -> Result<InstallationResult> {
+        let result = executor::execute("dnf", &["clean", "all"])?;
+        Ok(InstallationResult {
+            success: result.success(),
+            backend: "dnf".into(),
+            package: String::new(),
+            message: if result.success() {
+                "DNF cache cleaned".into()
+            } else {
+                format!(
+                    "dnf clean failed (exit {}): {}",
+                    result.exit_code,
+                    result.stderr.trim()
+                )
+            },
+        })
+    }
 }

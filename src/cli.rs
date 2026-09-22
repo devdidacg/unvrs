@@ -27,6 +27,9 @@ pub enum Commands {
     Search {
         /// Package name to search for
         package: String,
+        /// Search only in a specific backend
+        #[arg(short, long)]
+        backend: Option<String>,
     },
     /// Show detailed information about a package
     #[command(short_flag = 'I')]
@@ -39,6 +42,9 @@ pub enum Commands {
     Install {
         /// Package name to install
         package: String,
+        /// Simulate installation without making changes
+        #[arg(long)]
+        dry: bool,
     },
     /// Remove a package
     #[command(short_flag = 'r')]
@@ -57,6 +63,10 @@ pub enum Commands {
     List,
     /// Show packages with available updates
     Outdated,
+    /// Show installation history
+    History,
+    /// Clean system package cache
+    Clean,
     /// Diagnose system configuration
     Doctor,
 }

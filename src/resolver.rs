@@ -44,6 +44,18 @@ impl Resolver {
         Ok(cache::cached_search(package, &backend_refs))
     }
 
+    pub fn search_in_backend(
+        &self,
+        package: &str,
+        backend_name: &str,
+    ) -> Result<Vec<PackageCandidate>> {
+        if let Some(backend) = self.registry.find_by_name(backend_name) {
+            backend.search(package)
+        } else {
+            Err(UnvrsError::BackendUnavailable(backend_name.to_string()))
+        }
+    }
+
     pub fn search_with_status(&self, package: &str) -> Vec<(String, SearchStatus)> {
         self.registry
             .search_available(package)
@@ -85,6 +97,24 @@ impl Resolver {
             .ok_or_else(|| UnvrsError::BackendUnavailable(selected.backend.clone()))?;
 
         backend.install(package)
+    }
+
+    pub fn install_dry(&self, package: &str) -> Result<InstallationResult> {
+        let candidates = self.search(package)?;
+        if candidates.is_empty() {
+            return Err(UnvrsError::PackageNotFound(package.to_string()));
+        }
+
+        let selected = self.select_best(&candidates);
+        Ok(InstallationResult {
+            success: true,
+            backend: selected.backend.clone(),
+            package: package.to_string(),
+            message: format!(
+                "[dry run] Would install {} via {}",
+                package, selected.backend
+            ),
+        })
     }
 
     pub fn remove(&self, package: &str) -> Result<InstallationResult> {
@@ -145,6 +175,18 @@ impl Resolver {
             }
         }
         Ok(all)
+    }
+
+    pub fn clean(&self) -> Result<Vec<InstallationResult>> {
+        let mut results = Vec::new();
+        for backend in self.registry.backends() {
+            match backend.clean() {
+                Ok(r) => results.push(r),
+                Err(UnvrsError::BackendUnavailable(_)) => continue,
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(results)
     }
 
     fn select_best<'a>(&self, candidates: &'a [PackageCandidate]) -> &'a PackageCandidate {

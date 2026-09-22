@@ -1,6 +1,6 @@
 [package]
 name = "unvrs"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Universal package manager CLI — one interface over many package managers"
 license = "MIT"
@@ -10,6 +10,7 @@ repository = "https://github.com/unvrs/unvrs"
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+chrono = "0.4"
 toml = "0.8"
 dirs = "5"
 thiserror = "2"

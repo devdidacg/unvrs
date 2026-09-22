@@ -223,4 +223,22 @@ impl PackageManager for AptBackend {
 
         Ok(packages)
     }
+
+    fn clean(&self) -> Result<InstallationResult> {
+        let result = executor::execute("apt-get", &["clean"])?;
+        Ok(InstallationResult {
+            success: result.success(),
+            backend: "apt".into(),
+            package: String::new(),
+            message: if result.success() {
+                "APT cache cleaned".into()
+            } else {
+                format!(
+                    "apt clean failed (exit {}): {}",
+                    result.exit_code,
+                    result.stderr.trim()
+                )
+            },
+        })
+    }
 }
