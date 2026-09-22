@@ -1,6 +1,6 @@
 [package]
 name = "unvrs"
-version = "0.1.0"
+version = "0.2.4"
 edition = "2021"
 description = "Universal package manager CLI — one interface over many package managers"
 license = "MIT"
