@@ -1,3 +1,4 @@
+use crate::cache;
 use crate::config::Config;
 use crate::error::{Result, UnvrsError};
 use crate::os;
@@ -34,7 +35,13 @@ impl Resolver {
     }
 
     pub fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
-        self.registry.search_all(package)
+        let backend_refs: Vec<&dyn crate::backends::PackageManager> = self
+            .registry
+            .backends()
+            .iter()
+            .map(|b| b.as_ref())
+            .collect();
+        Ok(cache::cached_search(package, &backend_refs))
     }
 
     pub fn search_with_status(&self, package: &str) -> Vec<(String, SearchStatus)> {
@@ -100,6 +107,7 @@ impl Resolver {
                 Err(e) => return Err(e),
             }
         }
+        cache::clear_cache();
         Ok(results)
     }
 
@@ -119,6 +127,18 @@ impl Resolver {
         let mut all = Vec::new();
         for backend in self.registry.backends() {
             match backend.list_installed() {
+                Ok(mut pkgs) => all.append(&mut pkgs),
+                Err(UnvrsError::BackendUnavailable(_)) => continue,
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(all)
+    }
+
+    pub fn outdated(&self) -> Result<Vec<OutdatedPackage>> {
+        let mut all = Vec::new();
+        for backend in self.registry.backends() {
+            match backend.outdated() {
                 Ok(mut pkgs) => all.append(&mut pkgs),
                 Err(UnvrsError::BackendUnavailable(_)) => continue,
                 Err(e) => return Err(e),

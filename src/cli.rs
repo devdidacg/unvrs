@@ -10,6 +10,14 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
+
+    /// Output in JSON format
+    #[arg(long, global = true)]
+    pub json: bool,
+
+    /// Disable colored output
+    #[arg(long, global = true)]
+    pub no_color: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -47,6 +55,8 @@ pub enum Commands {
     /// List installed packages
     #[command(short_flag = 'l')]
     List,
+    /// Show packages with available updates
+    Outdated,
     /// Diagnose system configuration
     Doctor,
 }

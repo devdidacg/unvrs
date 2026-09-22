@@ -260,6 +260,33 @@ impl PackageManager for PacmanBackend {
 
         Ok(packages)
     }
+
+    fn outdated(&self) -> Result<Vec<OutdatedPackage>> {
+        let result = executor::execute("pacman", &["-Qu"])?;
+        if !result.success() {
+            return Ok(Vec::new());
+        }
+
+        let packages = result
+            .stdout
+            .lines()
+            .filter_map(|line| {
+                let mut parts = line.split_whitespace();
+                let name = parts.next()?.to_string();
+                let current_version = parts.next()?.to_string();
+                let _arrow = parts.next()?;
+                let latest_version = parts.next()?.to_string();
+                Some(OutdatedPackage {
+                    name,
+                    current_version,
+                    latest_version,
+                    backend: "pacman".into(),
+                })
+            })
+            .collect();
+
+        Ok(packages)
+    }
 }
 
 #[cfg(test)]

@@ -98,3 +98,79 @@ pub struct InstallationResult {
     pub package: String,
     pub message: String,
 }
+
+#[derive(Debug, Clone)]
+pub struct OutdatedPackage {
+    pub name: String,
+    pub current_version: String,
+    pub latest_version: String,
+    pub backend: String,
+}
+
+impl serde::Serialize for OutdatedPackage {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("OutdatedPackage", 4)?;
+        state.serialize_field("name", &self.name)?;
+        state.serialize_field("current_version", &self.current_version)?;
+        state.serialize_field("latest_version", &self.latest_version)?;
+        state.serialize_field("backend", &self.backend)?;
+        state.end()
+    }
+}
+
+impl serde::Serialize for PackageCandidate {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("PackageCandidate", 6)?;
+        state.serialize_field("name", &self.name)?;
+        state.serialize_field("version", &self.version)?;
+        state.serialize_field("source", &self.source.to_string())?;
+        state.serialize_field("backend", &self.backend)?;
+        state.serialize_field("architecture", &self.architecture)?;
+        state.serialize_field("description", &self.description)?;
+        state.end()
+    }
+}
+
+impl serde::Serialize for PackageInfo {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("PackageInfo", 10)?;
+        state.serialize_field("name", &self.name)?;
+        state.serialize_field("version", &self.version)?;
+        state.serialize_field("source", &self.source.to_string())?;
+        state.serialize_field("backend", &self.backend)?;
+        state.serialize_field("architecture", &self.architecture)?;
+        state.serialize_field("description", &self.description)?;
+        state.serialize_field("maintainer", &self.maintainer)?;
+        state.serialize_field("homepage", &self.homepage)?;
+        state.serialize_field("dependencies", &self.dependencies)?;
+        state.serialize_field("installed_size", &self.installed_size)?;
+        state.end()
+    }
+}
+
+impl serde::Serialize for InstalledPackage {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("InstalledPackage", 4)?;
+        state.serialize_field("name", &self.name)?;
+        state.serialize_field("version", &self.version)?;
+        state.serialize_field("source", &self.source.to_string())?;
+        state.serialize_field("backend", &self.backend)?;
+        state.end()
+    }
+}

@@ -32,6 +32,9 @@ pub trait PackageManager: Send + Sync {
     fn update(&self) -> Result<InstallationResult>;
     fn upgrade(&self) -> Result<InstallationResult>;
     fn list_installed(&self) -> Result<Vec<InstalledPackage>>;
+    fn outdated(&self) -> Result<Vec<OutdatedPackage>> {
+        Ok(Vec::new())
+    }
 }
 
 pub fn all_backends() -> Vec<Box<dyn PackageManager>> {

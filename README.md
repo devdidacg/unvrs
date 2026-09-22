@@ -2,7 +2,7 @@
 
 **Universal package manager CLI — one interface over many package managers.**
 
-[![Version](https://img.shields.io/badge/version-0.2.4-blue.svg)](https://github.com/devdidacg/unvrs/releases)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/devdidacg/unvrs/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 
@@ -26,6 +26,10 @@ unvrs detects the operating system, finds available package managers, searches f
 - Short flags for quick use (`-s`, `-i`, `-r`, etc.)
 - OS compatibility warnings
 - Auto-detects available package managers
+- **JSON output** (`--json`) for scripts and automation
+- **No-color mode** (`--no-color`) for pipes and CI
+- **Outdated packages** (`unvrs outdated`)
+- **Search cache** — faster repeated searches
 - TOML configuration
 - Typed errors with context
 
@@ -138,7 +142,15 @@ unvrs doctor
 | `unvrs update` | `-U` | Update package lists |
 | `unvrs upgrade` | `-u` | Upgrade packages |
 | `unvrs list` | `-l` | List installed packages |
+| `unvrs outdated` | — | Show packages with updates |
 | `unvrs doctor` | — | Diagnose system |
+
+### Global flags
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output in JSON format |
+| `--no-color` | Disable colored output |
 
 ### Examples
 
@@ -166,8 +178,18 @@ sudo unvrs -u
 # List installed packages
 unvrs -l
 
+# Check for outdated packages
+unvrs outdated
+
 # Diagnose your system
 unvrs doctor
+
+# JSON output for scripts
+unvrs --json search fish
+unvrs --json list
+
+# No-color output for pipes
+unvrs --no-color list | grep vim
 ```
 
 ### Output example
@@ -182,6 +204,21 @@ unvrs doctor
   Results:
   ● fish 4.0.0 (pacman)
     Friendly interactive shell
+```
+
+### JSON output
+
+```json
+[
+  {
+    "name": "fish",
+    "version": "4.0.0",
+    "source": "system",
+    "backend": "pacman",
+    "architecture": null,
+    "description": "Friendly interactive shell"
+  }
+]
 ```
 
 ### OS Compatibility
@@ -213,7 +250,7 @@ verbose = false
 
 ```
 CLI (clap)
-  → Core (resolver, OS detection, config)
+  → Core (resolver, OS detection, config, cache)
     → Backend registry
       → Individual backends (pacman, apt, dnf, ...)
 ```
@@ -226,6 +263,7 @@ src/
 ├── lib.rs           # Public modules
 ├── cli.rs           # Clap CLI definitions
 ├── config.rs        # TOML config loading
+├── cache.rs         # Search result cache
 ├── error.rs         # Typed errors
 ├── executor.rs      # Safe process execution
 ├── os.rs            # OS detection
