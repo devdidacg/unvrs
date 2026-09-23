@@ -92,13 +92,13 @@ curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/install.sh | ba
 
 ```bash
 # Update to latest
-curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/update.sh | bash
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/update.sh | bash
 
 # Uninstall (keeps config/data)
-curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/uninstall.sh | bash
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/uninstall.sh | bash
 
 # Uninstall and delete config + history
-curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/uninstall.sh | bash -s -- --purge
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/uninstall.sh | bash -s -- --purge
 ```
 
 Scripts are idempotent and ShellCheck-clean; use `--prefix DIR` to install
