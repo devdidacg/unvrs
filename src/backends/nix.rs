@@ -34,16 +34,12 @@ impl PackageManager for NixBackend {
         true
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn requires_root(&self) -> bool {
+        false
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("nix-env", ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -125,76 +121,27 @@ impl PackageManager for NixBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("nix-env", &["-iA", &format!("nixpkgs.{package}")])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "nix".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via nix")
-            } else {
-                format!(
-                    "nix install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "nix-env",
+            ["-iA".to_string(), format!("nixpkgs.{package}")],
+        ))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("nix-env", &["-e", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "nix".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via nix")
-            } else {
-                format!(
-                    "nix remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("nix-env", ["-e", package]))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("nix-channel", &["--update"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "nix".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via nix".into()
-            } else {
-                format!(
-                    "nix update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("nix-channel", ["--update"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("nix-env", &["-u"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "nix".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via nix".into()
-            } else {
-                format!(
-                    "nix upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("nix-env", ["-u"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {

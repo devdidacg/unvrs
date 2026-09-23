@@ -30,16 +30,16 @@ impl PackageManager for PkgBackend {
         os.family == OsFamily::BSD
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn native_distro_ids(&self) -> &'static [&'static str] {
+        &["freebsd", "ghostbsd", "hardenedbsd", "opnsense", "pfsense"]
+    }
+
+    fn requires_root(&self) -> bool {
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("pkg", ["-v"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -111,76 +111,27 @@ impl PackageManager for PkgBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("pkg", &["install", "-y", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "pkg".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via pkg")
-            } else {
-                format!(
-                    "pkg install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "pkg",
+            ["install", "-y", package],
+        ))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("pkg", &["delete", "-y", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "pkg".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via pkg")
-            } else {
-                format!(
-                    "pkg remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("pkg", ["delete", "-y", package]))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("pkg", &["update"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "pkg".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via pkg".into()
-            } else {
-                format!(
-                    "pkg update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("pkg", ["update"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("pkg", &["upgrade", "-y"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "pkg".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via pkg".into()
-            } else {
-                format!(
-                    "pkg upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("pkg", ["upgrade", "-y"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {

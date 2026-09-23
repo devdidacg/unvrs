@@ -2,165 +2,127 @@
 
 **Universal package manager CLI — one interface over many package managers.**
 
-[![Version](https://img.shields.io/badge/version-0.5.1-blue.svg)](https://github.com/devdidacg/unvrs/releases)
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](https://github.com/devdidacg/unvrs/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
+[![CI](https://github.com/devdidacg/unvrs/actions/workflows/ci.yml/badge.svg)](https://github.com/devdidacg/unvrs/actions/workflows/ci.yml)
 
 ---
 
 ## What is unvrs?
 
-unvrs is a unified CLI that orchestrates existing package managers. It does not replace native package managers — it delegates to them.
+unvrs orchestrates existing package managers — it does not replace them.
+It resolves *which* package manager should handle a package, shows you the
+exact plan, then executes it safely.
 
 ```bash
-sudo unvrs install fish
+unvrs plan install fish     # resolve + print the plan — changes nothing
+sudo unvrs install fish     # execute through the best backend
 ```
 
-unvrs detects the operating system, finds available package managers, searches for the package, and installs it through the appropriate backend.
+### Highlights (0.6.0)
 
-### Features
-
-- **24 package manager backends** — all fully implemented
-- **AUR support** — searches AUR when yay/paru is installed
-- **Universal backends** — flatpak, snap, nix, guix, brew work on ANY Linux distro
-- **Container backends** — run apt, dnf, yum, apk, pacman, zypper via Docker/Podman
-- **Cross-distro installs** — install from apt on Arch, from pacman on Ubuntu, etc.
-- Compact output with icons (✓ ✗ ⚠ ●)
-- Animated spinner during operations
-- Short flags for quick use (`-s`, `-i`, `-r`, etc.)
-- OS compatibility warnings
-- Auto-detects available package managers
-- **JSON output** (`--json`) for scripts and automation
-- **No-color mode** (`--no-color`) for pipes and CI
-- **Outdated packages** (`unvrs outdated`)
-- **Installation history** (`unvrs history`)
-- **Dry run** (`unvrs install --dry`)
-- **Backend filter** (`unvrs search --backend pacman`)
-- **Force install** (`unvrs install --force`) — install from any backend regardless of OS
-- **Clean cache** (`unvrs clean`)
-- **Search cache** — faster repeated searches
-- TOML configuration
-- Typed errors with context
+- **Plan / apply workflow** — `unvrs plan …`, `--dry`, `--explain` show the
+  chosen backend, the reasons, and the exact command before anything runs.
+- **Profiles** — save named package sets (`unvrs profile create dev git
+  neovim ripgrep`) and apply them later (`unvrs apply dev`).
+- **24 backends** — native distro PMs, universal PMs (flatpak, snap, nix,
+  guix, brew) and container PMs (apt/dnf/yum/apk/pacman/zypper via
+  Docker/Podman).
+- **Transparent resolution** — `--explain` prints every candidate, its class
+  (native/universal/container/cross-distro), and why the winner won.
+- **Safe by default** — exec-form argv only (no shell interpolation),
+  cross-distro installs gated behind `--cross-distro`, package names
+  validated before anything runs, command timeouts, read-only planning is
+  never recorded as a transaction.
+- **Transaction history** — every real change is recorded (`unvrs history`,
+  `unvrs history show <id>`) with backend, command and exit code. Dry runs
+  are never recorded.
+- **Machine-readable output** — `--json` on every command for scripts/CI.
+- **Actionable errors** — did-you-mean backend names, stderr snippets,
+  contextual suggestions, `unvrs doctor` for environment checks.
+- Compact output with icons (✓ ✗ ⚠ ●), animated TTY spinner, `-v` verbosity,
+  `--no-color` for pipes.
 
 ---
 
-## Supported Backends
+## Supported backends
 
-### Native Backends
+### Native
 
-| Backend | Status | Platforms |
-|:--------|:------:|-----------|
-| pacman | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Arch Linux, Manjaro, EndeavourOS |
-| apt | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Debian, Ubuntu, Linux Mint |
-| dnf | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Fedora, RHEL, CentOS 8+ |
-| yum | ![](https://img.shields.io/badge/-Implemented-brightgreen) | RHEL/CentOS 7 |
-| zypper | ![](https://img.shields.io/badge/-Implemented-brightgreen) | openSUSE, SLES |
-| apk | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Alpine Linux |
-| xbps | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Void Linux |
-| moss | ![](https://img.shields.io/badge/-Implemented-brightgreen) | moss-based distros |
-| emerge | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Gentoo, Funtoo |
-| eopkg | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Solus |
+| Backend | Platforms |
+|---|---|
+| pacman | Arch, Manjaro, EndeavourOS |
+| apt | Debian, Ubuntu, Mint |
+| dnf | Fedora, RHEL, CentOS 8+ |
+| yum | RHEL/CentOS 7 |
+| zypper | openSUSE, SLES |
+| apk | Alpine |
+| xbps | Void |
+| moss | moss-based distros |
+| emerge | Gentoo, Funtoo |
+| eopkg | Solus |
 
-### Universal Backends (work on ANY Linux)
+### Universal (any distro where installed)
 
-| Backend | Status | Notes |
-|:--------|:------:|-------|
-| flatpak | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Containerized apps |
-| snap | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Containerized apps |
-| nix | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Reproducible builds |
-| guix | ![](https://img.shields.io/badge/-Implemented-brightgreen) | GNU project |
-| brew | ![](https://img.shields.io/badge/-Implemented-brightgreen) | Homebrew |
+flatpak · snap · nix · guix · brew · pkg (FreeBSD)
 
-### Container Backends (via Docker/Podman)
+### Container (via Docker/Podman)
 
-| Backend | Status | Image |
-|:--------|:------:|-------|
-| apt (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | debian:latest |
-| apt (podman) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | debian:latest |
-| dnf (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | fedora:latest |
-| dnf (podman) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | fedora:latest |
-| yum (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | centos:7 |
-| apk (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | alpine:latest |
-| pacman (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | archlinux:latest |
-| zypper (docker) | ![](https://img.shields.io/badge/-Implemented-brightgreen) | opensuse/leap:latest |
+apt · dnf · yum · apk · pacman · zypper — each as `… (docker)` and
+`… (podman)` where applicable. Requires a reachable container daemon.
+
+### Cross-distro
+
+Any non-native backend can run directly on your host only with an explicit
+`--cross-distro` flag (legacy alias: `--force`). Universal backends never
+need it.
 
 ---
 
 ## Installation
 
-### Quick install (one-liner)
+### Quick install
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/install.sh | bash
 ```
 
-### Install / Update / Uninstall
+### Update / uninstall
 
 ```bash
-# Install
-curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/install.sh | bash
+# Update to latest
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/update.sh | bash
 
-# Update to latest version
-curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/update.sh | bash
+# Uninstall (keeps config/data)
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/uninstall.sh | bash
 
-# Uninstall
-curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/main/uninstall.sh | bash
+# Uninstall and delete config + history
+curl -sSL https://raw.githubusercontent.com/devdidacg/unvrs/uninstall.sh | bash -s -- --purge
 ```
+
+Scripts are idempotent and ShellCheck-clean; use `--prefix DIR` to install
+somewhere other than `/usr/local/bin`.
 
 ### Docker
 
 ```bash
 docker build -t unvrs .
-docker run unvrs doctor
+docker run --rm unvrs doctor
 ```
 
-### Manual install
-
-<details>
-<summary><b>Arch Linux / Archcraft</b></summary>
+### Manual build
 
 ```bash
-sudo pacman -S rust git
 git clone https://github.com/devdidacg/unvrs.git
 cd unvrs
 cargo build --release
 sudo cp target/release/unvrs /usr/local/bin/
+unvrs --version && unvrs doctor
 ```
 
-</details>
-
-<details>
-<summary><b>Debian / Ubuntu</b></summary>
-
-```bash
-sudo apt install rustc cargo git
-git clone https://github.com/devdidacg/unvrs.git
-cd unvrs
-cargo build --release
-sudo cp target/release/unvrs /usr/local/bin/
-```
-
-</details>
-
-<details>
-<summary><b>Fedora</b></summary>
-
-```bash
-sudo dnf install rust cargo git
-git clone https://github.com/devdidacg/unvrs.git
-cd unvrs
-cargo build --release
-sudo cp target/release/unvrs /usr/local/bin/
-```
-
-</details>
-
-### Verify
-
-```bash
-unvrs --version
-unvrs doctor
-```
+Dependencies by distro: `sudo pacman -S rust git` ·
+`sudo apt install rustc cargo git` · `sudo dnf install rust cargo git`
 
 ---
 
@@ -169,106 +131,140 @@ unvrs doctor
 ### Commands
 
 | Command | Short | Description |
-|---------|:-----:|-------------|
+|---|:---:|---|
 | `unvrs search <pkg>` | `-s` | Search all backends |
 | `unvrs info <pkg>` | `-I` | Show package details |
-| `unvrs install <pkg>` | `-i` | Install a package |
-| `unvrs remove <pkg>` | `-r` | Remove a package |
+| `unvrs install <pkg…>` | `-i` | Install package(s) |
+| `unvrs remove <pkg…>` | `-r` | Remove installed package(s) |
+| `unvrs plan install\|remove <pkg…>` | — | Print the plan, change nothing |
+| `unvrs apply <profile>` | — | Apply a named profile |
+| `unvrs profile create\|list\|show\|plan\|apply` | — | Manage profiles |
 | `unvrs update` | `-U` | Update package lists |
-| `unvrs upgrade` | `-u` | Upgrade packages |
+| `unvrs upgrade` | `-u` | Upgrade installed packages |
 | `unvrs list` | `-l` | List installed packages |
 | `unvrs outdated` | — | Show packages with updates |
-| `unvrs history` | — | Show installation history |
-| `unvrs clean` | — | Clean package cache |
-| `unvrs doctor` | — | Diagnose system |
+| `unvrs history [show <id>]` | — | Transaction history |
+| `unvrs clean` | — | Clean package caches |
+| `unvrs doctor` | — | Diagnose system configuration |
 
 ### Global flags
 
 | Flag | Description |
-|------|-------------|
-| `--json` | Output in JSON format |
-| `--no-color` | Disable colored output |
+|---|---|
+| `--json` | JSON output (single document on stdout; errors as JSON too) |
+| `--no-color` | Disable colors |
+| `-v`, `-vv`, `-vvv` | Log verbosity (stderr) |
 
-### Command flags
+### Plan & safety flags (install/remove/apply/plan)
 
-| Flag | Command | Description |
-|------|---------|-------------|
-| `--backend <name>` | search | Search only in a specific backend |
-| `--dry` | install | Simulate installation without changes |
-| `--force` | install | Install from any backend (cross-distro) |
+| Flag | Description |
+|---|---|
+| `--dry` | Simulate: resolve and print the plan, record nothing |
+| `--explain` | Print the full resolution report (candidates + reasons) |
+| `--backend <name>` | Use a specific backend (did-you-mean on typos) |
+| `--cross-distro` | Allow a non-native backend to run on the host |
+| `--container` | Prefer a container backend (install only) |
+| `--force` | Deprecated alias for `--cross-distro` (hidden) |
 
 ### Examples
 
 ```bash
-# Search for a package across all backends
-unvrs -s fish
+# Search
 unvrs search firefox
-
-# Search only in pacman
 unvrs search --backend pacman neovim
 
-# Install a package (uses the best available backend)
-sudo unvrs -i fish
-sudo unvrs install neovim
+# See exactly what would happen — then do it
+unvrs plan install firefox
+unvrs install --dry fish
+unvrs install --explain fish
+sudo unvrs install fish vim            # multiple packages
 
-# Dry run — simulate installation
-sudo unvrs install --dry fish
+# Pick the backend yourself
+sudo unvrs install --backend flatpak vlc
+sudo unvrs install --backend apt git --cross-distro   # non-native, explicit
 
-# Force install from any backend (cross-distro)
-sudo unvrs install --force apt git    # Install git from apt on Arch
-sudo unvrs install --force dnf vim    # Install vim from dnf on Ubuntu
+# Remove only what a backend really has installed
+sudo unvrs remove fish
+unvrs plan remove fish                 # preview first
 
-# Get package info
-unvrs -I git
+# Profiles
+unvrs profile create dev git neovim ripgrep
+unvrs profile list
+unvrs profile plan dev                 # preview the whole profile
+unvrs apply dev --dry
+sudo unvrs apply dev
 
-# Remove a package
-sudo unvrs -r fish
-
-# Update package lists
-sudo unvrs -U
-
-# Upgrade all packages
-sudo unvrs -u
-
-# List installed packages
-unvrs -l
-
-# Check for outdated packages
+# Housekeeping
+sudo unvrs update
+sudo unvrs upgrade
+unvrs list
 unvrs outdated
-
-# View installation history
-unvrs history
-
-# Clean package cache
 sudo unvrs clean
 
-# Diagnose your system
-unvrs doctor
+# History (dry runs are never recorded)
+unvrs history
+unvrs history show 42
 
-# JSON output for scripts
+# Automation
 unvrs --json search fish
-unvrs --json list
-
-# No-color output for pipes
-unvrs --no-color list | grep vim
+unvrs --json doctor
+unvrs --json plan install vim
 ```
 
-### Output example
+### Plan output
 
 ```
-  Searched fish
+UNVRS INSTALL PLAN
 
-  ✓ pacman
-  ✗ apt
-  ✗ dnf
+Package:  fish (resolved: fish)
+Backend:  pacman (native)
+Source:   Arch Linux repository (pacman)
 
-  Results:
-  ● fish 4.0.0 (pacman)
-    Friendly interactive shell
-  ● fish 4.0.0 (pacman (aur))
+Reason:
+  + native package manager for Arch Linux (arch)
+  + policy priority: unlisted (fallback)
+  + exact package name match
+  + package available in this backend
+
+Command:
+  sudo pacman -S --noconfirm fish
+
+Privileges: root/sudo required
+Rollback:   not supported by the selected backend(s)
+System:     Arch Linux (x86_64)
+
+No changes have been made.
 ```
 
-### JSON output
+### Explain output
+
+```bash
+unvrs install --explain fish
+```
+
+```
+Detected system:
+  Arch Linux
+  x86_64 (Linux)
+
+Candidates:
+  pacman       selected           (native)
+  flatpak      no package          (universal)
+  apt (docker) unavailable        (container)
+    backend not installed
+  …
+
+Selected:
+  pacman
+  resolved package: fish
+
+Reason:
+  + native package manager for Arch Linux (arch)
+  + exact package name match
+  …
+```
+
+### JSON contract
 
 ```json
 [
@@ -283,35 +279,48 @@ unvrs --no-color list | grep vim
 ]
 ```
 
-### OS Compatibility
+Errors are JSON too when `--json` is set:
 
-If you try to install from a backend that doesn't match your OS, unvrs warns you:
-
+```json
+{
+  "error": "unknown backend: fltapak",
+  "did_you_mean": "flatpak",
+  "suggestion": "Run `unvrs doctor` to see valid backend names."
+}
 ```
-  ⚠ apt (not native to Linux)
-```
 
-With `--force`, you can install from any backend regardless of OS:
-
-```bash
-# On Arch, install from apt via Docker
-sudo unvrs install --force apt git
-```
+Exit codes: `0` success · `1` failure · `2` usage error.
 
 ---
 
 ## Configuration
 
-Optional config at `~/.config/unvrs/config.toml`:
+Optional `~/.config/unvrs/config.toml` (XDG on Linux, `%APPDATA%` on Windows):
 
 ```toml
 [resolver]
-preferred_backends = ["pacman"]
+# Order matters: earlier = preferred. Names or class keywords.
+prefer = ["native", "universal", "flatpak"]
+avoid  = ["snap"]
 
 [output]
 color = true
-verbose = false
 ```
+
+- `prefer` accepts backend names (`"apt"`) or keywords
+  (`"native"`, `"universal"`, `"container"`).
+- `avoid` demotes matching backends (shown as *avoided* in `--explain`).
+- Invalid TOML aborts with the file path — no silent fallback to defaults.
+
+Environment overrides (useful for testing/CI/portable installs):
+
+| Variable | Effect |
+|---|---|
+| `UNVRS_CONFIG_DIR` | Directory for `config.toml` and `profiles/` |
+| `UNVRS_DATA_DIR` | Directory for `history.json` |
+
+Profiles live in `<config dir>/profiles/<name>.toml`; names may contain
+letters, digits, `-`, `_` (max 64 chars).
 
 ---
 
@@ -319,80 +328,44 @@ verbose = false
 
 ```
 CLI (clap)
-  → Core (resolver, OS detection, config, cache)
-    → Backend registry
-      → Individual backends (pacman, apt, dnf, ...)
-      → Universal backends (flatpak, snap, nix, guix, brew)
-      → Container backends (apt-docker, dnf-docker, ...)
+  → Dispatcher
+      → Resolver   (read-only probe of every backend → deterministic pick)
+      → Plan       (exact commands + privileges — pure data)
+      → Executor   (exec-form argv, timeouts, exit-code mapping)
+          → Backend registry (native / universal / container / cross)
 ```
 
-### Project structure
-
-```
-src/
-├── main.rs          # CLI entry point
-├── lib.rs           # Public modules
-├── cli.rs           # Clap CLI definitions
-├── config.rs        # TOML config loading
-├── cache.rs         # Search result cache
-├── history.rs       # Installation history
-├── error.rs         # Typed errors
-├── executor.rs      # Safe process execution
-├── os.rs            # OS detection
-├── package.rs       # Domain models
-├── registry.rs      # Backend discovery
-├── dispatcher.rs  # Universal search/install logic
-├── ui.rs            # Spinner, icons, formatting
-└── backends/
-    ├── mod.rs       # PackageManager trait
-    ├── pacman.rs    # Arch Linux + AUR
-    ├── apt.rs       # Debian/Ubuntu
-    ├── dnf.rs       # Fedora
-    ├── yum.rs       # RHEL/CentOS 7
-    ├── zypper.rs    # openSUSE
-    ├── apk.rs       # Alpine
-    ├── xbps.rs      # Void Linux
-    ├── moss.rs      # moss-based distros
-    ├── emerge.rs    # Gentoo
-    ├── eopkg.rs     # Solus
-    ├── nix.rs       # NixOS
-    ├── guix.rs      # GNU Guix
-    ├── flatpak.rs   # Any Linux
-    ├── snap.rs      # Any Linux
-    ├── pkg.rs       # FreeBSD
-    ├── brew.rs      # macOS/Linux
-    └── container.rs # Docker/Podman backends
-```
+Full details: [docs/architecture.md](docs/architecture.md) ·
+Adding a backend: [docs/backend-development.md](docs/backend-development.md)
 
 ---
 
 ## Development
 
 ```bash
-# Build
-cargo build
-
-# Run
-cargo run -- -s fish
-
-# Test
-cargo test
-
-# Format
-cargo fmt
-
-# Lint
-cargo clippy
+cargo build                  # build
+cargo run -- search fish     # run from source
+cargo test                   # unit + integration tests
+cargo fmt                    # format
+cargo clippy --all-targets --all-features -- -D warnings
 ```
+
+CI runs fmt, clippy (`-D warnings`), tests on Ubuntu + Windows, `cargo
+audit`, `cargo deny`, and a Docker build.
 
 ---
 
 ## Security
 
-- No shell injection — arguments are passed separately via `std::process::Command`
-- Native package managers handle signature verification and dependency resolution
-- Root operations require explicit `sudo`
-- Container backends run with `--rm` flag (auto-cleanup)
+- No shell injection — commands are exec-form (`program` + argv), package
+  names validated before resolution, hostile names (`-rf`, spaces, `;|&$\``)
+  rejected.
+- Non-native backends require explicit `--cross-distro`.
+- All backend commands run with timeouts; failures surface stderr snippets.
+- Planning is read-only and never recorded as a transaction.
+- Root operations only ever run the exact command shown in the plan, via
+  `sudo` when the backend declares `requires_root`.
+- Dependency hygiene: `cargo audit` + `cargo deny` in CI.
 
 ---
 

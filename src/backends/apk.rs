@@ -30,16 +30,16 @@ impl PackageManager for ApkBackend {
         os.family == OsFamily::Linux
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn native_distro_ids(&self) -> &'static [&'static str] {
+        &["alpine"]
+    }
+
+    fn requires_root(&self) -> bool {
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("apk", ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -140,76 +140,24 @@ impl PackageManager for ApkBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("apk", &["add", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "apk".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via apk")
-            } else {
-                format!(
-                    "apk install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("apk", ["add", package]))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("apk", &["del", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "apk".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via apk")
-            } else {
-                format!(
-                    "apk remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("apk", ["del", package]))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("apk", &["update"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "apk".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via apk".into()
-            } else {
-                format!(
-                    "apk update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("apk", ["update"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("apk", &["upgrade"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "apk".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via apk".into()
-            } else {
-                format!(
-                    "apk upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("apk", ["upgrade"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {

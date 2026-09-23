@@ -34,16 +34,12 @@ impl PackageManager for GuixBackend {
         true
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn requires_root(&self) -> bool {
+        false
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("guix", ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -120,76 +116,30 @@ impl PackageManager for GuixBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("guix", &["package", "-i", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "guix".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via guix")
-            } else {
-                format!(
-                    "guix install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "guix",
+            ["package", "-i", package],
+        ))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("guix", &["package", "-r", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "guix".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via guix")
-            } else {
-                format!(
-                    "guix remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "guix",
+            ["package", "-r", package],
+        ))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("guix", &["pull"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "guix".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via guix".into()
-            } else {
-                format!(
-                    "guix update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("guix", ["pull"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("guix", &["pull"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "guix".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via guix".into()
-            } else {
-                format!(
-                    "guix upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("guix", ["pull"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {

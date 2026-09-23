@@ -30,16 +30,16 @@ impl PackageManager for DnfBackend {
         os.family == OsFamily::Linux
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn native_distro_ids(&self) -> &'static [&'static str] {
+        &["fedora", "rhel", "centos", "rocky", "almalinux", "nobara"]
+    }
+
+    fn requires_root(&self) -> bool {
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("dnf", ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -120,76 +120,27 @@ impl PackageManager for DnfBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("dnf", &["install", "-y", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "dnf".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via dnf")
-            } else {
-                format!(
-                    "dnf install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "dnf",
+            ["install", "-y", package],
+        ))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("dnf", &["remove", "-y", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "dnf".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via dnf")
-            } else {
-                format!(
-                    "dnf remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("dnf", ["remove", "-y", package]))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("dnf", &["makecache"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "dnf".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via dnf".into()
-            } else {
-                format!(
-                    "dnf update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("dnf", ["makecache"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("dnf", &["upgrade", "-y"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "dnf".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via dnf".into()
-            } else {
-                format!(
-                    "dnf upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("dnf", ["upgrade", "-y"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("dnf", ["clean", "all"]))
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {
@@ -221,23 +172,5 @@ impl PackageManager for DnfBackend {
             .collect();
 
         Ok(packages)
-    }
-
-    fn clean(&self) -> Result<InstallationResult> {
-        let result = executor::execute("dnf", &["clean", "all"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "dnf".into(),
-            package: String::new(),
-            message: if result.success() {
-                "DNF cache cleaned".into()
-            } else {
-                format!(
-                    "dnf clean failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
     }
 }

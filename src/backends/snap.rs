@@ -34,16 +34,12 @@ impl PackageManager for SnapBackend {
         true
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn requires_root(&self) -> bool {
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("snap", ["version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -124,76 +120,24 @@ impl PackageManager for SnapBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("snap", &["install", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "snap".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via snap")
-            } else {
-                format!(
-                    "snap install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("snap", ["install", package]))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("snap", &["remove", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "snap".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via snap")
-            } else {
-                format!(
-                    "snap remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("snap", ["remove", package]))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("snap", &["refresh"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "snap".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via snap".into()
-            } else {
-                format!(
-                    "snap update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("snap", ["refresh"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("snap", &["refresh"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "snap".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via snap".into()
-            } else {
-                format!(
-                    "snap upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("snap", ["refresh"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {

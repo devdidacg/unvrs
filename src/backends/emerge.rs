@@ -30,16 +30,16 @@ impl PackageManager for EmergeBackend {
         os.family == OsFamily::Linux
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn native_distro_ids(&self) -> &'static [&'static str] {
+        &["gentoo", "funtoo", "calculate"]
+    }
+
+    fn requires_root(&self) -> bool {
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("emerge", ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -115,76 +115,24 @@ impl PackageManager for EmergeBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("emerge", &[package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "emerge".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via emerge")
-            } else {
-                format!(
-                    "emerge install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("emerge", [package]))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("emerge", &["--unmerge", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "emerge".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via emerge")
-            } else {
-                format!(
-                    "emerge remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("emerge", ["--unmerge", package]))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("emerge", &["--sync"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "emerge".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via emerge".into()
-            } else {
-                format!(
-                    "emerge update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("emerge", ["--sync"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("emerge", &["-u", "@world"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "emerge".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via emerge".into()
-            } else {
-                format!(
-                    "emerge upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("emerge", ["-u", "@world"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {

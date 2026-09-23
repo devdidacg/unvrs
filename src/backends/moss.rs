@@ -30,16 +30,16 @@ impl PackageManager for MossBackend {
         os.family == OsFamily::Linux
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn native_distro_ids(&self) -> &'static [&'static str] {
+        &["moss", "bismuth"]
+    }
+
+    fn requires_root(&self) -> bool {
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("moss", ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -114,76 +114,24 @@ impl PackageManager for MossBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("moss", &["install", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "moss".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via moss")
-            } else {
-                format!(
-                    "moss install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("moss", ["install", package]))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("moss", &["remove", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "moss".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via moss")
-            } else {
-                format!(
-                    "moss remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("moss", ["remove", package]))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("moss", &["update"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "moss".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via moss".into()
-            } else {
-                format!(
-                    "moss update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("moss", ["update"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("moss", &["upgrade"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "moss".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via moss".into()
-            } else {
-                format!(
-                    "moss upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("moss", ["upgrade"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {

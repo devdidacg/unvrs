@@ -40,16 +40,24 @@ impl PackageManager for PacmanBackend {
         os.family == OsFamily::Linux
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn native_distro_ids(&self) -> &'static [&'static str] {
+        &[
+            "arch",
+            "archarm",
+            "endeavouros",
+            "garuda",
+            "artix",
+            "arcolinux",
+            "cachyos",
+        ]
+    }
+
+    fn requires_root(&self) -> bool {
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("pacman", ["-V"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -205,76 +213,39 @@ impl PackageManager for PacmanBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("pacman", &["-S", "--noconfirm", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "pacman".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via pacman")
-            } else {
-                format!(
-                    "pacman install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        // Prefer an AUR helper when present: it transparently handles both
+        // repository and AUR packages.
+        if let Some(helper) = self.aur_helper() {
+            Some(executor::CommandSpec::new(
+                &helper,
+                ["-S", "--noconfirm", package],
+            ))
+        } else {
+            Some(executor::CommandSpec::new(
+                "pacman",
+                ["-S", "--noconfirm", package],
+            ))
+        }
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("pacman", &["-R", "--noconfirm", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "pacman".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via pacman")
-            } else {
-                format!(
-                    "pacman remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "pacman",
+            ["-R", "--noconfirm", package],
+        ))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("pacman", &["-Sy"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "pacman".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via pacman".into()
-            } else {
-                format!(
-                    "pacman update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("pacman", ["-Sy"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("pacman", &["-Su", "--noconfirm"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "pacman".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via pacman".into()
-            } else {
-                format!(
-                    "pacman upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("pacman", ["-Su", "--noconfirm"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("pacman", ["-Sc", "--noconfirm"]))
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {
@@ -332,24 +303,6 @@ impl PackageManager for PacmanBackend {
 
         Ok(packages)
     }
-
-    fn clean(&self) -> Result<InstallationResult> {
-        let result = executor::execute("pacman", &["-Sc", "--noconfirm"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "pacman".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Pacman cache cleaned".into()
-            } else {
-                format!(
-                    "pacman clean failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
-    }
 }
 
 #[cfg(test)]
@@ -363,11 +316,10 @@ mod tests {
     }
 
     #[test]
-    fn pacman_capabilities() {
+    fn pacman_install_spec_uses_noconfirm() {
         let b = PacmanBackend::new();
-        let caps = b.capabilities();
-        assert!(caps.can_search);
-        assert!(caps.can_install);
-        assert!(caps.can_remove);
+        let spec = b.install_spec("fish").unwrap();
+        assert!(spec.args.contains(&"--noconfirm".to_string()));
+        assert!(spec.args.contains(&"fish".to_string()));
     }
 }

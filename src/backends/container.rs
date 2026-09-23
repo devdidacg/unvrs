@@ -1,48 +1,71 @@
 use crate::backends::PackageManager;
-use crate::error::{Result, UnvrsError};
-use crate::executor::{self, CommandResult};
+use crate::error::Result;
+use crate::executor::{self, CommandSpec};
 use crate::package::*;
 
+/// Declarative description of a containerized package manager.
+/// All commands are executed in exec-form (`docker run IMAGE prog args...`) —
+/// never through `sh -c` with interpolated user input.
 struct ContainerConfig {
     name: &'static str,
     container_engine: &'static str,
     image: &'static str,
-    install_prefix: &'static str,
-    remove_prefix: &'static str,
-    search_prefix: &'static str,
-    info_prefix: &'static str,
-    list_prefix: &'static str,
-    update_prefix: &'static str,
-    upgrade_prefix: &'static str,
+    /// Binary + fixed args for each operation; the package name (when needed)
+    /// is appended as a separate argument by the caller.
+    search: (&'static str, &'static [&'static str]),
+    info: (&'static str, &'static [&'static str]),
+    list: (&'static str, &'static [&'static str]),
+    install: (&'static str, &'static [&'static str]),
+    remove: (&'static str, &'static [&'static str]),
+    update: (&'static str, &'static [&'static str]),
+    upgrade: (&'static str, &'static [&'static str]),
 }
 
 pub struct ContainerBackend {
     name: &'static str,
     container_engine: String,
     image: String,
-    install_prefix: String,
-    remove_prefix: String,
-    search_prefix: String,
-    info_prefix: String,
-    list_prefix: String,
-    update_prefix: String,
-    upgrade_prefix: String,
+    search: (&'static str, &'static [&'static str]),
+    info: (&'static str, &'static [&'static str]),
+    list: (&'static str, &'static [&'static str]),
+    install: (&'static str, &'static [&'static str]),
+    remove: (&'static str, &'static [&'static str]),
+    update: (&'static str, &'static [&'static str]),
+    upgrade: (&'static str, &'static [&'static str]),
+}
+
+macro_rules! container {
+    ($name:expr, $engine:expr, $image:expr, $search:expr, $info:expr, $list:expr,
+     $install:expr, $remove:expr, $update:expr, $upgrade:expr) => {
+        ContainerBackend {
+            name: $name,
+            container_engine: $engine.to_string(),
+            image: $image.to_string(),
+            search: $search,
+            info: $info,
+            list: $list,
+            install: $install,
+            remove: $remove,
+            update: $update,
+            upgrade: $upgrade,
+        }
+    };
 }
 
 impl ContainerBackend {
     fn from_config(config: ContainerConfig) -> Self {
-        Self {
-            name: config.name,
-            container_engine: config.container_engine.to_string(),
-            image: config.image.to_string(),
-            install_prefix: config.install_prefix.to_string(),
-            remove_prefix: config.remove_prefix.to_string(),
-            search_prefix: config.search_prefix.to_string(),
-            info_prefix: config.info_prefix.to_string(),
-            list_prefix: config.list_prefix.to_string(),
-            update_prefix: config.update_prefix.to_string(),
-            upgrade_prefix: config.upgrade_prefix.to_string(),
-        }
+        container!(
+            config.name,
+            config.container_engine,
+            config.image,
+            config.search,
+            config.info,
+            config.list,
+            config.install,
+            config.remove,
+            config.update,
+            config.upgrade
+        )
     }
 
     pub fn apt_docker() -> Self {
@@ -50,13 +73,13 @@ impl ContainerBackend {
             name: "apt (docker)",
             container_engine: "docker",
             image: "debian:latest",
-            install_prefix: "apt-get install -y",
-            remove_prefix: "apt-get remove -y",
-            search_prefix: "apt-cache search",
-            info_prefix: "apt-cache show",
-            list_prefix: "dpkg -l",
-            update_prefix: "apt-get update",
-            upgrade_prefix: "apt-get upgrade -y",
+            search: ("apt-cache", &["search"]),
+            info: ("apt-cache", &["show"]),
+            list: ("dpkg", &["--get-selections"]),
+            install: ("apt-get", &["install", "-y"]),
+            remove: ("apt-get", &["remove", "-y"]),
+            update: ("apt-get", &["update"]),
+            upgrade: ("apt-get", &["upgrade", "-y"]),
         })
     }
 
@@ -65,13 +88,13 @@ impl ContainerBackend {
             name: "apt (podman)",
             container_engine: "podman",
             image: "debian:latest",
-            install_prefix: "apt-get install -y",
-            remove_prefix: "apt-get remove -y",
-            search_prefix: "apt-cache search",
-            info_prefix: "apt-cache show",
-            list_prefix: "dpkg -l",
-            update_prefix: "apt-get update",
-            upgrade_prefix: "apt-get upgrade -y",
+            search: ("apt-cache", &["search"]),
+            info: ("apt-cache", &["show"]),
+            list: ("dpkg", &["--get-selections"]),
+            install: ("apt-get", &["install", "-y"]),
+            remove: ("apt-get", &["remove", "-y"]),
+            update: ("apt-get", &["update"]),
+            upgrade: ("apt-get", &["upgrade", "-y"]),
         })
     }
 
@@ -80,13 +103,13 @@ impl ContainerBackend {
             name: "dnf (docker)",
             container_engine: "docker",
             image: "fedora:latest",
-            install_prefix: "dnf install -y",
-            remove_prefix: "dnf remove -y",
-            search_prefix: "dnf search",
-            info_prefix: "dnf info",
-            list_prefix: "rpm -qa",
-            update_prefix: "dnf check-update || true",
-            upgrade_prefix: "dnf upgrade -y",
+            search: ("dnf", &["search"]),
+            info: ("dnf", &["info"]),
+            list: ("rpm", &["-qa"]),
+            install: ("dnf", &["install", "-y"]),
+            remove: ("dnf", &["remove", "-y"]),
+            update: ("dnf", &["makecache"]),
+            upgrade: ("dnf", &["upgrade", "-y"]),
         })
     }
 
@@ -95,13 +118,13 @@ impl ContainerBackend {
             name: "dnf (podman)",
             container_engine: "podman",
             image: "fedora:latest",
-            install_prefix: "dnf install -y",
-            remove_prefix: "dnf remove -y",
-            search_prefix: "dnf search",
-            info_prefix: "dnf info",
-            list_prefix: "rpm -qa",
-            update_prefix: "dnf check-update || true",
-            upgrade_prefix: "dnf upgrade -y",
+            search: ("dnf", &["search"]),
+            info: ("dnf", &["info"]),
+            list: ("rpm", &["-qa"]),
+            install: ("dnf", &["install", "-y"]),
+            remove: ("dnf", &["remove", "-y"]),
+            update: ("dnf", &["makecache"]),
+            upgrade: ("dnf", &["upgrade", "-y"]),
         })
     }
 
@@ -110,13 +133,13 @@ impl ContainerBackend {
             name: "yum (docker)",
             container_engine: "docker",
             image: "centos:7",
-            install_prefix: "yum install -y",
-            remove_prefix: "yum remove -y",
-            search_prefix: "yum search",
-            info_prefix: "yum info",
-            list_prefix: "rpm -qa",
-            update_prefix: "yum check-update || true",
-            upgrade_prefix: "yum update -y",
+            search: ("yum", &["search"]),
+            info: ("yum", &["info"]),
+            list: ("rpm", &["-qa"]),
+            install: ("yum", &["install", "-y"]),
+            remove: ("yum", &["remove", "-y"]),
+            update: ("yum", &["makecache"]),
+            upgrade: ("yum", &["update", "-y"]),
         })
     }
 
@@ -125,13 +148,13 @@ impl ContainerBackend {
             name: "apk (docker)",
             container_engine: "docker",
             image: "alpine:latest",
-            install_prefix: "apk add",
-            remove_prefix: "apk del",
-            search_prefix: "apk search",
-            info_prefix: "apk info",
-            list_prefix: "apk list --installed",
-            update_prefix: "apk update",
-            upgrade_prefix: "apk upgrade",
+            search: ("apk", &["search"]),
+            info: ("apk", &["info"]),
+            list: ("apk", &["list", "--installed"]),
+            install: ("apk", &["add"]),
+            remove: ("apk", &["del"]),
+            update: ("apk", &["update"]),
+            upgrade: ("apk", &["upgrade"]),
         })
     }
 
@@ -140,13 +163,13 @@ impl ContainerBackend {
             name: "pacman (docker)",
             container_engine: "docker",
             image: "archlinux:latest",
-            install_prefix: "pacman -S --noconfirm",
-            remove_prefix: "pacman -R --noconfirm",
-            search_prefix: "pacman -Ss",
-            info_prefix: "pacman -Si",
-            list_prefix: "pacman -Q",
-            update_prefix: "pacman -Sy",
-            upgrade_prefix: "pacman -Syu --noconfirm",
+            search: ("pacman", &["-Ss"]),
+            info: ("pacman", &["-Si"]),
+            list: ("pacman", &["-Q"]),
+            install: ("pacman", &["-S", "--noconfirm"]),
+            remove: ("pacman", &["-R", "--noconfirm"]),
+            update: ("pacman", &["-Sy"]),
+            upgrade: ("pacman", &["-Syu", "--noconfirm"]),
         })
     }
 
@@ -155,27 +178,27 @@ impl ContainerBackend {
             name: "zypper (docker)",
             container_engine: "docker",
             image: "opensuse/leap:latest",
-            install_prefix: "zypper install -y",
-            remove_prefix: "zypper remove -y",
-            search_prefix: "zypper search",
-            info_prefix: "zypper info",
-            list_prefix: "rpm -qa",
-            update_prefix: "zypper refresh",
-            upgrade_prefix: "zypper update -y",
+            search: ("zypper", &["search"]),
+            info: ("zypper", &["info"]),
+            list: ("rpm", &["-qa"]),
+            install: ("zypper", &["install", "-y"]),
+            remove: ("zypper", &["remove", "-y"]),
+            update: ("zypper", &["refresh"]),
+            upgrade: ("zypper", &["update", "-y"]),
         })
     }
 
-    fn run_in_container(&self, command: &str) -> Result<CommandResult> {
-        let safe_cmd = command.replace('"', "\\\"");
-        let full_command = format!(
-            "{engine} run --rm --name unvrs-{pid} {image} sh -c \"{cmd}\"",
-            engine = self.container_engine,
-            pid = std::process::id(),
-            image = self.image,
-            cmd = safe_cmd,
-        );
-
-        executor::execute_raw(&full_command)
+    /// Build the full container-engine command for an in-container operation.
+    /// Exec-form only: `<engine> run --rm <image> <program> <args...>`.
+    fn container_spec(&self, program: &str, args: &[&str]) -> CommandSpec {
+        let mut full: Vec<String> = vec![
+            "run".into(),
+            "--rm".into(),
+            self.image.clone(),
+            program.into(),
+        ];
+        full.extend(args.iter().map(|a| a.to_string()));
+        CommandSpec::new(&self.container_engine, full)
     }
 }
 
@@ -196,24 +219,23 @@ impl PackageManager for ContainerBackend {
         true
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn requires_root(&self) -> bool {
+        false
+    }
+
+    fn version_probe(&self) -> Option<CommandSpec> {
+        Some(CommandSpec::new(&self.container_engine, ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
-        let command = format!("{} {}", self.search_prefix, package);
-        let result = self.run_in_container(&command)?;
+        let (prog, fixed) = self.search;
+        let mut args: Vec<&str> = fixed.to_vec();
+        args.push(package);
+        let spec = self.container_spec(prog, &args);
+        let result = executor::execute(&spec.program, &spec.args)?;
         if !result.success() {
-            return Err(UnvrsError::CommandFailed {
-                command: format!("{} search {}", self.name, package),
+            return Err(crate::error::UnvrsError::CommandFailed {
+                command: spec.display,
                 exit_code: result.exit_code,
                 stderr: result.stderr,
             });
@@ -244,8 +266,11 @@ impl PackageManager for ContainerBackend {
     }
 
     fn info(&self, package: &str) -> Result<Option<PackageInfo>> {
-        let command = format!("{} {}", self.info_prefix, package);
-        let result = self.run_in_container(&command)?;
+        let (prog, fixed) = self.info;
+        let mut args: Vec<&str> = fixed.to_vec();
+        args.push(package);
+        let spec = self.container_spec(prog, &args);
+        let result = executor::execute(&spec.program, &spec.args)?;
         if !result.success() {
             return Ok(None);
         }
@@ -279,89 +304,41 @@ impl PackageManager for ContainerBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let command = format!("{} {}", self.install_prefix, package);
-        let result = self.run_in_container(&command)?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: self.name.to_string(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via {}", self.name)
-            } else {
-                format!(
-                    "{} install failed (exit {}): {}",
-                    self.name,
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<CommandSpec> {
+        let (prog, fixed) = self.install;
+        let mut args: Vec<&str> = fixed.to_vec();
+        args.push(package);
+        Some(self.container_spec(prog, &args))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let command = format!("{} {}", self.remove_prefix, package);
-        let result = self.run_in_container(&command)?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: self.name.to_string(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via {}", self.name)
-            } else {
-                format!(
-                    "{} remove failed (exit {}): {}",
-                    self.name,
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<CommandSpec> {
+        let (prog, fixed) = self.remove;
+        let mut args: Vec<&str> = fixed.to_vec();
+        args.push(package);
+        Some(self.container_spec(prog, &args))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = self.run_in_container(&self.update_prefix)?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: self.name.to_string(),
-            package: String::new(),
-            message: if result.success() {
-                format!("Package lists updated via {}", self.name)
-            } else {
-                format!(
-                    "{} update failed (exit {}): {}",
-                    self.name,
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<CommandSpec> {
+        let (prog, fixed) = self.update;
+        Some(self.container_spec(prog, fixed))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = self.run_in_container(&self.upgrade_prefix)?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: self.name.to_string(),
-            package: String::new(),
-            message: if result.success() {
-                format!("Packages upgraded via {}", self.name)
-            } else {
-                format!(
-                    "{} upgrade failed (exit {}): {}",
-                    self.name,
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<CommandSpec> {
+        let (prog, fixed) = self.upgrade;
+        Some(self.container_spec(prog, fixed))
+    }
+
+    fn clean_spec(&self) -> Option<CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {
-        let result = self.run_in_container(&self.list_prefix)?;
+        let (prog, fixed) = self.list;
+        let spec = self.container_spec(prog, fixed);
+        let result = executor::execute(&spec.program, &spec.args)?;
         if !result.success() {
-            return Err(UnvrsError::CommandFailed {
-                command: format!("{} list", self.name),
+            return Err(crate::error::UnvrsError::CommandFailed {
+                command: spec.display,
                 exit_code: result.exit_code,
                 stderr: result.stderr,
             });
@@ -391,5 +368,56 @@ impl PackageManager for ContainerBackend {
             .collect();
 
         Ok(packages)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn install_spec_is_exec_form_without_shell() {
+        let b = ContainerBackend::apt_docker();
+        let spec = b.install_spec("git").unwrap();
+        assert_eq!(spec.program, "docker");
+        assert_eq!(spec.args[0], "run");
+        assert!(spec.args.contains(&"--rm".to_string()));
+        // image then program then args — no sh -c anywhere
+        assert!(!spec.args.iter().any(|a| a == "sh" || a.contains("-c")));
+        assert!(spec.args.contains(&"apt-get".to_string()));
+        assert!(spec.args.contains(&"git".to_string()));
+    }
+
+    #[test]
+    fn hostile_package_name_stays_a_single_argument() {
+        let b = ContainerBackend::apt_docker();
+        let evil = "foo; rm -rf /";
+        // Would be rejected by validation upstream; ensure the spec builder
+        // still treats it as ONE argument (no splitting, no shell).
+        let spec = b.install_spec(evil).unwrap();
+        assert!(spec.args.contains(&evil.to_string()));
+        assert_eq!(
+            spec.args.iter().filter(|a| *a == &evil.to_string()).count(),
+            1
+        );
+    }
+
+    #[test]
+    fn container_names_are_unique() {
+        let backends = [
+            ContainerBackend::apt_docker(),
+            ContainerBackend::apt_podman(),
+            ContainerBackend::dnf_docker(),
+            ContainerBackend::dnf_podman(),
+            ContainerBackend::yum_docker(),
+            ContainerBackend::apk_docker(),
+            ContainerBackend::pacman_docker(),
+            ContainerBackend::zypper_docker(),
+        ];
+        let mut names: Vec<&str> = backends.iter().map(|b| b.name()).collect();
+        names.sort_unstable();
+        let n = names.len();
+        names.dedup();
+        assert_eq!(n, names.len());
     }
 }

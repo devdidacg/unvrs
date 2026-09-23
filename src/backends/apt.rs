@@ -30,16 +30,26 @@ impl PackageManager for AptBackend {
         os.family == OsFamily::Linux
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn native_distro_ids(&self) -> &'static [&'static str] {
+        &[
+            "debian",
+            "ubuntu",
+            "raspbian",
+            "devuan",
+            "deepin",
+            "elementary",
+            "zorin",
+            "pop",
+            "neon",
+        ]
+    }
+
+    fn requires_root(&self) -> bool {
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("apt-get", ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -124,76 +134,30 @@ impl PackageManager for AptBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("apt-get", &["install", "-y", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "apt".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via apt")
-            } else {
-                format!(
-                    "apt install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "apt-get",
+            ["install", "-y", package],
+        ))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("apt-get", &["remove", "-y", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "apt".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via apt")
-            } else {
-                format!(
-                    "apt remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "apt-get",
+            ["remove", "-y", package],
+        ))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("apt-get", &["update"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "apt".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via apt".into()
-            } else {
-                format!(
-                    "apt update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("apt-get", ["update"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("apt-get", &["upgrade", "-y"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "apt".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via apt".into()
-            } else {
-                format!(
-                    "apt upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("apt-get", ["upgrade", "-y"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("apt-get", ["clean"]))
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {
@@ -222,23 +186,5 @@ impl PackageManager for AptBackend {
             .collect();
 
         Ok(packages)
-    }
-
-    fn clean(&self) -> Result<InstallationResult> {
-        let result = executor::execute("apt-get", &["clean"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "apt".into(),
-            package: String::new(),
-            message: if result.success() {
-                "APT cache cleaned".into()
-            } else {
-                format!(
-                    "apt clean failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
     }
 }

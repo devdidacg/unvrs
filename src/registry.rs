@@ -31,11 +31,18 @@ impl BackendRegistry {
             .map(|b| b.as_ref())
     }
 
+    /// Find a backend by display label, tolerating suffixes produced by
+    /// search results (e.g. `pacman (aur)` -> `pacman`).
     pub fn find_by_name_any(&self, name: &str) -> Option<&dyn PackageManager> {
-        self.all_backends
-            .iter()
-            .find(|b| b.name() == name)
-            .map(|b| b.as_ref())
+        if let Some(b) = self.all_backends.iter().find(|b| b.name() == name) {
+            return Some(b.as_ref());
+        }
+        if let Some(base) = name.strip_suffix(" (aur)") {
+            if let Some(b) = self.all_backends.iter().find(|b| b.name() == base) {
+                return Some(b.as_ref());
+            }
+        }
+        None
     }
 
     pub fn search_all(&self, package: &str) -> Result<Vec<PackageCandidate>> {

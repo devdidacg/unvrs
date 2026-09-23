@@ -30,16 +30,22 @@ impl PackageManager for ZypperBackend {
         os.family == OsFamily::Linux
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn native_distro_ids(&self) -> &'static [&'static str] {
+        &[
+            "opensuse",
+            "opensuse-leap",
+            "opensuse-tumbleweed",
+            "sles",
+            "suse",
+        ]
+    }
+
+    fn requires_root(&self) -> bool {
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("zypper", ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -127,76 +133,24 @@ impl PackageManager for ZypperBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("zypper", &["in", "-y", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "zypper".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via zypper")
-            } else {
-                format!(
-                    "zypper install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("zypper", ["in", "-y", package]))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("zypper", &["rm", "-y", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "zypper".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via zypper")
-            } else {
-                format!(
-                    "zypper remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("zypper", ["rm", "-y", package]))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("zypper", &["ref"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "zypper".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via zypper".into()
-            } else {
-                format!(
-                    "zypper update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("zypper", ["ref"]))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("zypper", &["up", "-y"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "zypper".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via zypper".into()
-            } else {
-                format!(
-                    "zypper upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("zypper", ["up", "-y"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {

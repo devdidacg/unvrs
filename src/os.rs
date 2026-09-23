@@ -8,6 +8,8 @@ pub fn detect() -> OperatingSystem {
             name: "Windows".into(),
             version: windows_version(),
             family: OsFamily::Windows,
+            arch: std::env::consts::ARCH.into(),
+            id_like: Vec::new(),
         }
     }
     #[cfg(target_os = "macos")]
@@ -17,6 +19,8 @@ pub fn detect() -> OperatingSystem {
             name: "macOS".into(),
             version: macos_version(),
             family: OsFamily::MacOS,
+            arch: std::env::consts::ARCH.into(),
+            id_like: Vec::new(),
         }
     }
     #[cfg(target_os = "linux")]
@@ -30,6 +34,8 @@ pub fn detect() -> OperatingSystem {
             name: "Unknown".into(),
             version: None,
             family: OsFamily::Unknown,
+            arch: std::env::consts::ARCH.into(),
+            id_like: Vec::new(),
         }
     }
 }
@@ -60,16 +66,15 @@ fn macos_version() -> Option<String> {
 
 #[cfg(target_os = "linux")]
 fn linux_detect() -> OperatingSystem {
+    let arch = std::env::consts::ARCH.to_string();
     if let Some(os_release) = parse_os_release() {
-        let family = match os_release.id.as_str() {
-            "arch" | "manjaro" | "endeavouros" | "garuda" | "artix" => OsFamily::Linux,
-            _ => OsFamily::Linux,
-        };
         OperatingSystem {
             id: os_release.id,
             name: os_release.name,
             version: os_release.version,
-            family,
+            family: OsFamily::Linux,
+            arch,
+            id_like: os_release.id_like,
         }
     } else {
         OperatingSystem {
@@ -77,6 +82,8 @@ fn linux_detect() -> OperatingSystem {
             name: "Linux".into(),
             version: None,
             family: OsFamily::Linux,
+            arch,
+            id_like: Vec::new(),
         }
     }
 }
@@ -86,6 +93,7 @@ struct OsReleaseInfo {
     id: String,
     name: String,
     version: Option<String>,
+    id_like: Vec<String>,
 }
 
 #[cfg(target_os = "linux")]
@@ -97,6 +105,7 @@ fn parse_os_release() -> Option<OsReleaseInfo> {
     let mut id = String::new();
     let mut name = String::new();
     let mut version = None;
+    let mut id_like = Vec::new();
 
     for line in content.lines() {
         if let Some(val) = line.strip_prefix("ID=") {
@@ -105,6 +114,12 @@ fn parse_os_release() -> Option<OsReleaseInfo> {
             name = val.trim_matches('"').to_string();
         } else if let Some(val) = line.strip_prefix("VERSION_ID=") {
             version = Some(val.trim_matches('"').to_string());
+        } else if let Some(val) = line.strip_prefix("ID_LIKE=") {
+            id_like = val
+                .trim_matches('"')
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect();
         }
     }
 
@@ -112,7 +127,12 @@ fn parse_os_release() -> Option<OsReleaseInfo> {
         return None;
     }
 
-    Some(OsReleaseInfo { id, name, version })
+    Some(OsReleaseInfo {
+        id,
+        name,
+        version,
+        id_like,
+    })
 }
 
 pub fn is_linux() -> bool {
@@ -127,11 +147,23 @@ pub fn is_unix() -> bool {
 mod tests {
     use super::*;
 
+    fn sample_os() -> OperatingSystem {
+        OperatingSystem {
+            id: "ubuntu".into(),
+            name: "Ubuntu".into(),
+            version: Some("24.04".into()),
+            family: OsFamily::Linux,
+            arch: "x86_64".into(),
+            id_like: Vec::new(),
+        }
+    }
+
     #[test]
     fn detect_runs() {
         let os = detect();
         assert!(!os.id.is_empty());
         assert!(!os.name.is_empty());
+        assert!(!os.arch.is_empty());
     }
 
     #[test]
@@ -139,5 +171,13 @@ mod tests {
         assert_eq!(OsFamily::Linux.to_string(), "Linux");
         assert_eq!(OsFamily::Windows.to_string(), "Windows");
         assert_eq!(OsFamily::Unknown.to_string(), "Unknown");
+    }
+
+    #[test]
+    fn os_label() {
+        assert_eq!(sample_os().label(), "Ubuntu 24.04");
+        let mut os = sample_os();
+        os.version = None;
+        assert_eq!(os.label(), "Ubuntu");
     }
 }

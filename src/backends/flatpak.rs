@@ -34,16 +34,14 @@ impl PackageManager for FlatpakBackend {
         true
     }
 
-    fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities {
-            can_search: true,
-            can_info: true,
-            can_install: true,
-            can_remove: true,
-            can_update: true,
-            can_upgrade: true,
-            can_list: true,
-        }
+    fn requires_root(&self) -> bool {
+        // System-wide installs need privileges; flatpak also supports
+        // --user installs. Treat as root-required for safety messaging.
+        true
+    }
+
+    fn version_probe(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("flatpak", ["--version"]))
     }
 
     fn search(&self, package: &str) -> Result<Vec<PackageCandidate>> {
@@ -124,76 +122,33 @@ impl PackageManager for FlatpakBackend {
         }))
     }
 
-    fn install(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("flatpak", &["install", "-y", "flathub", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "flatpak".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} installed successfully via flatpak")
-            } else {
-                format!(
-                    "flatpak install failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn install_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "flatpak",
+            ["install", "-y", "flathub", package],
+        ))
     }
 
-    fn remove(&self, package: &str) -> Result<InstallationResult> {
-        let result = executor::execute("flatpak", &["uninstall", "-y", package])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "flatpak".into(),
-            package: package.to_string(),
-            message: if result.success() {
-                format!("{package} removed successfully via flatpak")
-            } else {
-                format!(
-                    "flatpak remove failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn remove_spec(&self, package: &str) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "flatpak",
+            ["uninstall", "-y", package],
+        ))
     }
 
-    fn update(&self) -> Result<InstallationResult> {
-        let result = executor::execute("flatpak", &["update", "--appstream"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "flatpak".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Package lists updated via flatpak".into()
-            } else {
-                format!(
-                    "flatpak update failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn update_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new(
+            "flatpak",
+            ["update", "--appstream"],
+        ))
     }
 
-    fn upgrade(&self) -> Result<InstallationResult> {
-        let result = executor::execute("flatpak", &["update", "-y"])?;
-        Ok(InstallationResult {
-            success: result.success(),
-            backend: "flatpak".into(),
-            package: String::new(),
-            message: if result.success() {
-                "Packages upgraded via flatpak".into()
-            } else {
-                format!(
-                    "flatpak upgrade failed (exit {}): {}",
-                    result.exit_code,
-                    result.stderr.trim()
-                )
-            },
-        })
+    fn upgrade_spec(&self) -> Option<executor::CommandSpec> {
+        Some(executor::CommandSpec::new("flatpak", ["update", "-y"]))
+    }
+
+    fn clean_spec(&self) -> Option<executor::CommandSpec> {
+        None
     }
 
     fn list_installed(&self) -> Result<Vec<InstalledPackage>> {
